@@ -1,3 +1,5 @@
+import { IPathGenerator } from '../def/PathFactoryDef';
+
 // 藍色玩家外圈路徑 (52格)
 // 起點 [1, 6]，順時針繞行
 const BLUE_OUTER_PATH = [
@@ -15,27 +17,47 @@ const BLUE_OUTER_PATH = [
     [0, 7]  // 最後回到藍色箭頭格 (轉向入口)
 ];
 
-// 藍色玩家內線路徑
+// 藍色玩家內線路徑(直衝中心)
 const BLUE_INNER_PATH = [
-    [1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6, 7] // 直衝中心
+    [1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6, 7]
 ];
 
-export class PathGenterator {
+/**
+ *基礎路徑產生器，提供標準的路徑生成邏輯和座標轉換方法
+ */
+export class BasicPathGenerator implements IPathGenerator {
     
     private _pathMap: Record<number, number[][]> = {};
+    private readonly GRID_SIZE = 15;
+    private readonly PLAYER_COUNT = 4;
 
-    get pathMap() {
+    public createPaths(): void {
+        // 獲取藍色基礎路徑 (包含 Outer + Inner)
+        const basePath = [...BLUE_OUTER_PATH, ...BLUE_INNER_PATH];
+        
+        for (let playerType = 0; playerType < this.PLAYER_COUNT; playerType++) {
+            // 根據玩家類型進行座標轉換
+            this._pathMap[playerType] = basePath.map(coord => 
+                this.rotateCoords(coord[0], coord[1], playerType)
+            );
+        }
+        
+        console.log(`路徑生成完成：共 ${this.PLAYER_COUNT} 玩家，每條路徑 ${basePath.length} 格`);
+        console.log('all paths:', this._pathMap);
+    }
+
+    public getPathMap(): Record<number, number[][]> {
         return this._pathMap;
     }
-    
-    public createPaths():void {
-        // 獲取藍色基礎路徑 (包含 Outer + Inner)
-        const base = [...BLUE_OUTER_PATH, ...BLUE_INNER_PATH];
-        for (let playerType = 0; playerType < 4; playerType++) {
-            // 根據玩家類型進行座標轉換
-            this._pathMap[playerType] = base.map(coord => this.rotateCoords(coord[0], coord[1], playerType));  
-        }   
+
+    public getPlayerPath(playerType: number): number[][] {
+        if (!this._pathMap[playerType]) {
+            console.warn(`玩家 ${playerType} 的路徑不存在`);
+            return [];
+        }
+        return this._pathMap[playerType];
     }
+
     /**
      * 將藍色路徑座標旋轉以適應其他玩家
      * @param row 原始 Row
@@ -43,20 +65,23 @@ export class PathGenterator {
      * @param playerType 0:藍, 1:紅, 2:綠, 3:黃
      */
     private rotateCoords(row: number, col: number, playerType: number): [number, number] {
-        const center = 7; // 15x15 的中心索引是 7
+        const center = Math.floor(this.GRID_SIZE / 2); // 15x15 的中心索引是 7
         let r = row - center;
         let c = col - center;
 
+        // 順時針旋轉 90 度 * playerType 次
         for (let i = 0; i < playerType; i++) {
             // 順時針旋轉 90 度公式: (r, c) -> (-c, r)
             let temp = r;
             r = -c;
             c = temp;
+            /*
+            const temp = r;
+            r = c;
+            c = -temp;
+            */
         }
-        return [r + center, c + center];
-    }
 
-    public getPlayerPath(playerType: number): number[][] {
-        return this._pathMap[playerType] || [];    
+        return [r + center, c + center];
     }
 }

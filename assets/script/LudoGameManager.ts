@@ -2,6 +2,7 @@ import { _decorator, color, Component, Graphics, Node, UITransform, Vec3 } from 
 import { BoardGeneratorManager } from './map/factory/BoardGeneratorManager';
 import { PathManager } from './map/path/PathManager';
 import { LudoGameMode } from './gameDef/GameDef';
+import { GameModeManager } from './gameMode/GameModeManager';
 const { ccclass, property } = _decorator;
 
 @ccclass('LudoGameManager')
@@ -9,29 +10,46 @@ export class LudoGameManager extends Component {
     
     @property({type:Node,displayName:"testNode",tooltip:"TESTNODE",visible:true})
     private _testNode: Node = null;
+    
+    @property({type:GameModeManager,displayName:"遊戲模式管理器",tooltip:"負責管理遊戲模式的組件",visible:true})
+    private _gameModeManager: GameModeManager = null;
+    
 
+    /*
     @property({type:BoardGeneratorManager,displayName:"棋盤生成管理器",tooltip:"負責管理棋盤生成的組件",visible:true})
     private _boardGeneratorManager: BoardGeneratorManager = null!;
     private _pathManager: PathManager = new PathManager();
+    */
 
-    start() {
-
+    public async initGameMode(gameMode: LudoGameMode): Promise<void> {
+        return this._gameModeManager.initGameMode(gameMode);
     }
 
+    //--廢棄
     public async setBoard(gameMode: LudoGameMode): Promise<void> {
+        /*
         this._boardGeneratorManager.setGameMode(gameMode);
         await this._boardGeneratorManager.createBoardGenerator();
-        this._pathManager.createPaths();
+        this._pathManager.setGameMode(gameMode);
+        await this._pathManager.createPathGenerator();
+        console.log('棋盤和路徑生成完成，遊戲準備就緒');
+        */
     }
 
     public testPathMode(): void {
         
-        const playerType = 0; // 0: Blue, 1: Red, 2: Green, 3: Yellow
-        const playerDestination = this._pathManager.getPlayerDestination(playerType, [1, 6], 9);
+        const playerType = 3; // 0: Blue, 1: Red, 2: Green, 3: Yellow
+        this._gameModeManager.rotateBoardView(1);
+        const playerDestination = this._gameModeManager.getPlayerDestinationByPos(playerType, [1, 6], 9);
         console.log(`Player ${playerType} destination after moving 5 steps from [1, 6]:`, playerDestination);
-        const pos=this._boardGeneratorManager.getCellPosition(playerDestination[0],playerDestination[1]);
+        
+        const playerDes=this._gameModeManager.getPlayerDestinationByIndex(playerType, 0, 9);
+        console.log(`Player ${playerType} AAAA after moving 5 steps from index 0:`, playerDes);
+        
+        
+        const pos=this._gameModeManager.getCellPosition(playerDes[0],playerDes[1]);
         this.testDraw(pos);
-        console.log(`Player ${playerType} destination position in world coordinates:`, pos);    
+        //console.log(`Player ${playerType} destination position in world coordinates:`, pos);    
         //const playerPathSegment = this._pathManager.getPlayerPathSegment(playerType, [1, 6], 5);
         //console.log(`Player ${playerType} path segment from [1, 6] moving 5 steps:`, playerPathSegment);
         //const otherPlayerDestination = this._pathManager.getOtherPlayerDestToGlobal(playerType, 1, 0, 5);
@@ -56,7 +74,7 @@ export class LudoGameManager extends Component {
 
 
     //----move player----
-    public movePlayer(playerType: number, startPos: [number, number], steps: number): void {
+    public movePlayerByPos(playerType: number, startPos: [number, number], steps: number): void {
 
     }
 
