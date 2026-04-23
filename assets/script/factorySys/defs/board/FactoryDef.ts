@@ -2,12 +2,25 @@ import { Vec3, Prefab, Component,Node, _decorator, SpriteFrame, CCBoolean, Enum 
 import { LudoGameMode } from '../../../gameDef/GameDef';
 
 const { ccclass, property } = _decorator;
+
+/**
+ * 棋盤生成模式
+ */
+export enum BoardGenerateMode {
+    /** 使用 Prefab 生成格子（可視化調試用） */
+    PREFAB_GRID = 'prefab',
+    /** 只計算座標，不建立實際節點（最輕量） */
+    POS_ONLY = 'pos_only',
+    /** 動態創建空節點（推薦：自動適配縮放） */
+    DYNAMIC_GRID = 'dynamic'
+}
+
 /**
  * 所有棋盤生成器都必須實現這個interface
  */
 export interface IBoardGenerator {
     //-生成棋盤
-    generateBoard(useGridPrefab?: boolean): Promise<void>;
+    generateBoard(mode?: BoardGenerateMode): Promise<void>;
     //-獲取指定格子的位置
     getCellPosition(r: number, c: number): Vec3;
     //-獲取所有格子位置
@@ -18,11 +31,10 @@ export interface IBoardGenerator {
 }
 
 export interface IBoardResourceConfig {
-    gridPrefab?: Prefab;//格子預製件（可選
-    bgSpriteFrame?: SpriteFrame;//背景圖片（可選
+    gridPrefab?: Prefab;//格子預製件（可選，用於 PREFAB_GRID 模式）
+    bgSpriteFrame?: SpriteFrame;//背景圖片（可選）
     boardContainerNode?: Node;// 棋盤生成的父節點 
-    bgContainerNode?: Node;//背景容器節點（可選
-    usePosGridOnly?: boolean; // 是否只生成座標格子，不建立實際節點
+    bgContainerNode?: Node;//背景容器節點（可選）
 }
 
 export interface IBoardConfig {
@@ -30,7 +42,7 @@ export interface IBoardConfig {
     gridSize: number;//棋盤網格大小（如 15x15）
     cellSize: number;//單個格子的視覺大小（像素）
     boardHeight: number;//棋盤容器的高度（像素），用於計算格子間距
-    useGridPrefab: boolean;//是否使用格子預製件來生成棋盤
+    generateMode: BoardGenerateMode;//棋盤生成模式
     useBgBoard: boolean;//是否使用背景圖片 
 }
 

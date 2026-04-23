@@ -178,7 +178,7 @@
     "_priority": 0,
     "_fov": 45,
     "_fovAxis": 0,
-    "_orthoHeight": 645.087440381558,
+    "_orthoHeight": 534.5981554677207,
     "_near": 0,
     "_far": 2000,
     "_color": {
@@ -654,7 +654,7 @@
     "__type__": "BoardConfigGroup",
     "gridPrefab": null,
     "bgSpriteFrame": {
-      "__uuid__": "85076362-73c8-462d-b7e2-887b8ed159e2@f9941",
+      "__uuid__": "4904b47e-4fc8-4bca-9d7f-df7c46c41eb5@f9941",
       "__expectedType__": "cc.SpriteFrame"
     },
     "boardContainerNode": {
@@ -663,11 +663,10 @@
     "bgContainerNode": {
       "__id__": 7
     },
-    "usePosGridOnly": false,
     "gridSize": 15,
-    "cellSize": 50,
+    "cellSize": 48,
     "boardHeight": 720,
-    "useGridPrefab": false,
+    "generateMode": "dynamic",
     "useBgBoard": true
   },
   {

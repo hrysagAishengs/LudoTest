@@ -1,7 +1,7 @@
 import { Vec3, Prefab, Component, Node, _decorator, SpriteFrame, CCBoolean, Enum } from 'cc';
 import { LudoGameMode } from '../../gameDef/GameDef';
 import { IGameModeConfig } from '../defs/GameModeFactoryDef';
-import { IBoardConfig, IBoardResourceConfig, ICreateBoardConfig } from '../defs/board/FactoryDef';
+import { IBoardConfig, IBoardResourceConfig, ICreateBoardConfig, BoardGenerateMode } from '../defs/board/FactoryDef';
 import { IPathConfig } from '../defs/path/PathFactoryDef';
 
 const { ccclass, property } = _decorator;
@@ -23,7 +23,7 @@ export class BoardConfigGroup {
     @property({ 
         type: Prefab,
         tooltip: '格子預製件（可選）',
-        visible: function() { return this.useGridPrefab; }
+        visible: function() { return this.generateMode === BoardGenerateMode.PREFAB_GRID; }
     })
     gridPrefab?: Prefab = null;
     
@@ -47,11 +47,6 @@ export class BoardConfigGroup {
     })
     bgContainerNode?: Node = null;
     
-    @property({ 
-        tooltip: '是否只生成座標格子，不建立實際節點'
-    })
-    usePosGridOnly: boolean = false;
-    
     // ========== 棋盤邏輯配置 ==========
     
     @property({ 
@@ -62,7 +57,7 @@ export class BoardConfigGroup {
     @property({ 
         tooltip: '單個格子的視覺大小（像素）'
     })
-    cellSize: number = 50;
+    cellSize: number = 48;
     
     @property({ 
         tooltip: '棋盤容器的高度（像素），用於計算格子間距'
@@ -70,9 +65,10 @@ export class BoardConfigGroup {
     boardHeight: number = 720;
     
     @property({ 
-        tooltip: '是否使用格子預製件來生成棋盤'
+        type: Enum(BoardGenerateMode),
+        tooltip: '棋盤生成模式：PREFAB_GRID=使用預製件(可視化), POS_ONLY=只計算座標(最輕量), DYNAMIC_GRID=動態空節點(推薦)'
     })
-    useGridPrefab: boolean = false;
+    generateMode: BoardGenerateMode = BoardGenerateMode.DYNAMIC_GRID;
     
     @property({ 
         tooltip: '是否使用背景圖片'
@@ -88,14 +84,13 @@ export class BoardConfigGroup {
                 gridPrefab: this.gridPrefab,
                 bgSpriteFrame: this.bgSpriteFrame,
                 boardContainerNode: this.boardContainerNode,
-                bgContainerNode: this.bgContainerNode,
-                usePosGridOnly: this.usePosGridOnly
+                bgContainerNode: this.bgContainerNode
             },
             boardConfig: {
                 gridSize: this.gridSize,
                 cellSize: this.cellSize,
                 boardHeight: this.boardHeight,
-                useGridPrefab: this.useGridPrefab,
+                generateMode: this.generateMode,
                 useBgBoard: this.useBgBoard
             }
         };

@@ -1,5 +1,5 @@
 import { _decorator, Prefab,Node, Sprite, SpriteFrame } from 'cc';
-import { BoardFactory, IBoardGenerator, ICreateBoardConfig } from '../../defs/board/FactoryDef';
+import { BoardFactory, IBoardGenerator, ICreateBoardConfig, BoardGenerateMode } from '../../defs/board/FactoryDef';
 import { BasicBoardGenerator } from '../../generators/board/BasicBoardGenerator';
 //import { BoardFactory, IBoardGenerator, ICreateBoardConfig } from '';
 //import { BasicBoardGenerator } from '../board/BasicBoardGenerator';
@@ -33,9 +33,9 @@ export class BasicBoardFactory extends BoardFactory {
         
         this._currentBoard.cellPrefab = this._currentConfig?.boardResourceConfig.gridPrefab || null;
         this._currentBoard.nodeContainer = boardContainerNode || null;
-        const useGridPrefab = this._currentConfig?.boardConfig.useGridPrefab || false;
+        const generateMode = this._currentConfig?.boardConfig.generateMode || BoardGenerateMode.DYNAMIC_GRID;
         //--生成棋盤
-        await this._currentBoard.generateBoard(useGridPrefab);
+        await this._currentBoard.generateBoard(generateMode);
         
         if(this._currentConfig?.boardResourceConfig.bgSpriteFrame && bgContainerNode){
             const sp=bgContainerNode.getComponent(Sprite);

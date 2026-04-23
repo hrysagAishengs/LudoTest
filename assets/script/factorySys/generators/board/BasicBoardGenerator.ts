@@ -1,5 +1,5 @@
 import { _decorator, Component, Node, Vec3, UITransform, instantiate, Prefab, Color, Sprite } from 'cc';
-import { IBoardGenerator } from '../../defs/board/FactoryDef';
+import { IBoardGenerator, BoardGenerateMode } from '../../defs/board/FactoryDef';
 
 
 
@@ -11,19 +11,19 @@ export class BasicBoardGenerator implements IBoardGenerator{
     // === 棋盤配置參數（從配置傳入） ===
     private _gridSize: number = 15; // 棋盤格子數量（預設 15x15）
     private _boardHeight: number = 720; // 棋盤容器高度（像素，預設 720）
-    private _cellSize: number = 50; // 單個格子的視覺大小（像素，預設 50）
+    private _cellSize: number = 48; // 單個格子的視覺大小（像素，預設 48）
     
     /**
      * 格子間距（中心點到中心點的距離）
-     * 計算公式：(棋盤高度 - 格子大小) / (格子數 - 1)
+     * 計算公式：棋盤高度 / 格子數
      * 
      * 解釋：
-     * - 15個格子需要14個間距
-     * - 可用空間 = 720 - 50 = 670 像素
-     * - 每個間距 = 670 / 14 ≈ 47.86 像素
+     * - 格子緊密排列，無間隙
+     * - 720 / 15 = 48 像素（每個格子佔用 48 像素）
+     * - 格子大小 = 格子間距 = 48 像素
      */
     private get CELL_SPACING(): number {
-        return (this._boardHeight - this._cellSize) / (this._gridSize - 1);
+        return this._boardHeight / this._gridSize;
     }
 
     // 儲存所有格子的引用，方便之後透過座標找節點
@@ -44,14 +44,24 @@ export class BasicBoardGenerator implements IBoardGenerator{
     }
     
     //=========interface methods========================================
-    public async generateBoard(useGridPrefab: boolean=true): Promise<void>{
+    public async generateBoard(mode: BoardGenerateMode = BoardGenerateMode.PREFAB_GRID): Promise<void>{
        
         return new Promise((resolve,reject) => {
             try{
-                if (useGridPrefab) {
-                    this.createPrefabGrid();
-                } else {
-                    this.createPosGridOnly();
+                switch (mode) {
+                    case BoardGenerateMode.DYNAMIC_GRID:
+                        this.createDynamicGrid();
+                        break;
+                    case BoardGenerateMode.PREFAB_GRID:
+                        this.createPrefabGrid();
+                        break;
+                    case BoardGenerateMode.POS_ONLY:
+                        this.createPosGridOnly();
+                        break;
+                    default:
+                        console.error(`未知的棋盤生成模式: ${mode}`);
+                        reject(new Error(`Unknown board generate mode: ${mode}`));
+                        return;
                 }
                 resolve();
             }catch (error) {
@@ -196,8 +206,37 @@ export class BasicBoardGenerator implements IBoardGenerator{
         }
     }
 
-   
+    /**
+     * 動態創建空節點網格（不使用 Prefab）
+     * 每個格子是一個帶 UITransform 的空 Node，緊密排列
+     * 適用於有背景圖的情況，通過實際 Node 獲取坐標，自動適配縮放
+     */
+    private createDynamicGrid(): void {
+        // 計算偏移量，讓棋盤中心在 (0,0)
+        const offset = (this._gridSize - 1) * this.CELL_SPACING / 2;
+       
+        for (let r = 0; r < this._gridSize; r++) {
+            this._cells[r] = [];
+            for (let c = 0; c < this._gridSize; c++) {
+                // 創建空節點
+                const cell = new Node(`Cell_${r}_${c}`);
+                cell.parent = this.nodeContainer;
 
-    
+                // 添加 UITransform 並設置尺寸
+                const transform = cell.addComponent(UITransform);
+                transform.setContentSize(this._cellSize, this._cellSize);
+                transform.setAnchorPoint(0.5, 0.5); // 錨點在中心
+                
+                // 計算位置（Col=X, Row=Y）
+                const posX = c * this.CELL_SPACING - offset;
+                const posY = r * this.CELL_SPACING - offset;
+                cell.setPosition(posX, posY, 0);
+                
+                this._cells[r][c] = cell;
+            }
+        }
+        
+        console.log(`動態網格生成完成：${this._gridSize}x${this._gridSize} = ${this._gridSize * this._gridSize} 個節點`);
+    }
 
 }

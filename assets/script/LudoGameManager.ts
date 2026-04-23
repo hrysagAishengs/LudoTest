@@ -38,8 +38,8 @@ export class LudoGameManager extends Component {
 
     public testPathMode(): void {
         
-        const playerType = 3; // 0: Blue, 1: Red, 2: Green, 3: Yellow
-        this._gameModeManager.rotateBoardView(1);
+        const playerType = 3 // 0: Blue, 1: Red, 2: Green, 3: Yellow
+        this._gameModeManager.rotateBoardView(playerType);
         const playerDestination = this._gameModeManager.getPlayerDestinationByPos(playerType, [1, 6], 9);
         console.log(`Player ${playerType} destination after moving 5 steps from [1, 6]:`, playerDestination);
         
@@ -48,6 +48,8 @@ export class LudoGameManager extends Component {
         
         
         const pos=this._gameModeManager.getCellPosition(playerDes[0],playerDes[1]);
+        //const test = this._gameModeManager.getPlayerDestinationByPos(playerType, [1, 6], 55);
+        //const pos=this._gameModeManager.getCellPosition(test[0],test[1]);
         this.testDraw(pos);
         //console.log(`Player ${playerType} destination position in world coordinates:`, pos);    
         //const playerPathSegment = this._pathManager.getPlayerPathSegment(playerType, [1, 6], 5);
@@ -63,10 +65,10 @@ export class LudoGameManager extends Component {
         
         let testNode:Node=new Node();
         let uitransform=testNode.addComponent(UITransform);
-        uitransform.setContentSize(50,50);
+        uitransform.setContentSize(48,48);
         let graphic:Graphics=testNode.addComponent(Graphics);
         graphic.fillColor=color(0,0,0,255);
-        graphic.rect(-25,-25,50,50);
+        graphic.rect(-24,-24,48,48);
         graphic.fill();
         this._testNode.addChild(testNode);
         testNode.setPosition(pos);
