@@ -55,7 +55,8 @@ export class BasicPathFactory extends PathFactory {
         }
         
         // 執行路徑生成
-        this._currentGenerator.createPaths();
+        //this._currentGenerator.createPaths();
+        this._currentGenerator.createPathAndBaseMaps();
         
         return this._currentGenerator;
     }
@@ -69,10 +70,19 @@ export class BasicPathFactory extends PathFactory {
             this._currentTransformer = new BasicViewTransformer();
         }
         
-        // 將路徑數據設置到轉換器中
+        // 將路徑和基地數據設置到轉換器中
         if (this._currentGenerator) {
             this._currentTransformer.setPathContent(this._currentGenerator.getPathMap());
-            console.log('視角轉換器已關聯路徑數據');
+            this._currentTransformer.setBaseContent(this._currentGenerator.getBaseMap());
+            
+            // 設置基地坑位配置
+            if (this._currentConfig) {
+                const offset = this._currentConfig.baseSlotIdOffset ?? -1;
+                const slotsPerPlayer = this._currentConfig.slotsPerPlayer ?? 4;
+                this._currentTransformer.setBaseSlotConfig(offset, slotsPerPlayer);
+            }
+            
+            console.log('視角轉換器已關聯路徑和基地數據');
         } else {
             console.warn('路徑生成器尚未創建，視角轉換器可能無法正常工作');
         }

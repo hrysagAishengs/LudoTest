@@ -23,8 +23,12 @@ export interface IBoardGenerator {
     generateBoard(mode?: BoardGenerateMode): Promise<void>;
     //-獲取指定格子的位置
     getCellPosition(r: number, c: number): Vec3;
+    //-獲取玩家基地坑位的位置(放置旗子的地方)
+    getBaseSlotPosition(r: number, c: number):Vec3;
     //-獲取所有格子位置
     getAllPositions(): Vec3[][];
+    //-獲取所有玩家基地坑位的位置
+    getAllBaseSlotPositions(): Vec3[][];
     //-獲取棋盤的網格大小
     getGridSize(): number;
     removeBoard(): void;

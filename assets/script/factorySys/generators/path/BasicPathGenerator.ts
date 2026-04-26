@@ -23,6 +23,20 @@ const BLUE_INNER_PATH = [
     [1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6, 7]
 ];
 
+// 藍色玩家基地棋子座標 (4個坑位)
+// 對應棋盤上的四格交會處，適合放置旗子
+const BLUE_BASE_SLOTS = [
+    [1, 1],[3, 1],[3, 3],[1, 3]
+];
+/**
+ *  Blue:   [1,1], [3,1], [3,3], [1,3]
+    Red:    [10,1], [12,1], [12,3], [10,3]    (row+9)
+    Green:  [10,10], [12,10], [12,12], [10,12] (row+9, col+9)
+    Yellow: [1,10], [3,10], [3,12], [1,12]    (col+9)
+ */
+
+
+
 /**
  * 基礎路徑產生器，提供標準的路徑生成邏輯和座標轉換方法
  * 
@@ -35,6 +49,7 @@ const BLUE_INNER_PATH = [
 export class BasicPathGenerator implements IPathGenerator {
     
     private _pathMap: Record<number, number[][]> = {};
+    private _baseMap: Record<number, number[][]> = {};
     
     // 硬編碼配置（當前實現限制）
     private readonly GRID_SIZE = 15;  // 路徑座標為 15×15 棋盤設計，不可更改
@@ -106,6 +121,27 @@ export class BasicPathGenerator implements IPathGenerator {
         console.log('all paths:', this._pathMap);
     }
 
+     /**
+     * 產生所有玩家的基地棋子座標映射
+     * 基於藍色玩家的基地座標進行平移轉換（保持順時針順序）
+     */
+    public createBaseMaps(): void {
+        for (let playerType = 0; playerType < this._playerCount; playerType++) {
+            // 根據玩家類型進行座標轉換（使用專門的基地坐標轉換方法）
+            this._baseMap[playerType] = BLUE_BASE_SLOTS.map(coord => 
+                this.translateBaseCoords(coord[0], coord[1], playerType)
+            );
+        }
+        
+        console.log(`基地座標生成完成：共 ${this._playerCount} 玩家，每個基地 ${BLUE_BASE_SLOTS.length} 個坑位`);
+        console.log('all base maps:', this._baseMap);
+    }
+    //--兩個一起產生
+    public createPathAndBaseMaps(): void {
+        this.createPaths();
+        this.createBaseMaps();
+    }
+
     public getPathMap(): Record<number, number[][]> {
         return this._pathMap;
     }
@@ -116,6 +152,57 @@ export class BasicPathGenerator implements IPathGenerator {
             return [];
         }
         return this._pathMap[playerType];
+    }
+
+    /**
+     * 獲取所有玩家的基地棋子座標映射
+     */
+    public getBaseMap(): Record<number, number[][]> {
+        return this._baseMap;
+    }
+
+    /**
+     * 獲取指定玩家的基地棋子座標
+     * @param playerType 玩家類型 (0:藍, 1:紅, 2:綠, 3:黃)
+     */
+    public getPlayerBaseSlots(playerType: number): number[][] {
+        if (!this._baseMap[playerType]) {
+            console.warn(`玩家 ${playerType} 的基地座標不存在`);
+            return [];
+        }
+        return this._baseMap[playerType];
+    }
+
+    /**
+     * 將藍色基地坑位座標平移以適應其他玩家
+     * 基地坑位採用區塊平移而非旋轉，以保持順時針排列順序
+     * 
+     * @param row 原始 Row
+     * @param col 原始 Col
+     * @param playerType 0:藍(左下), 1:紅(左上), 2:綠(右上), 3:黃(右下)
+     * @returns 轉換後的座標 [row, col]
+     * 
+     * 轉換規則：
+     * - Blue(0):   基準 [1,1], [3,1], [3,3], [1,3]
+     * - Red(1):    row+9 → [10,1], [12,1], [12,3], [10,3]
+     * - Green(2):  row+9, col+9 → [10,10], [12,10], [12,12], [10,12]
+     * - Yellow(3): col+9 → [1,10], [3,10], [3,12], [1,12]
+     */
+    private translateBaseCoords(row: number, col: number, playerType: number): [number, number] {
+        const offset = 9;  // 基地區塊間距（從左下到左上/右下的距離）
+        
+        switch(playerType) {
+            case 0: // Blue (左下) - 基準位置
+                return [row, col];
+            case 1: // Red (左上) - row方向平移
+                return [row + offset, col];
+            case 2: // Green (右上) - 對角平移
+                return [row + offset, col + offset];
+            case 3: // Yellow (右下) - col方向平移
+                return [row, col + offset];
+            default:
+                return [row, col];
+        }
     }
 
     /**

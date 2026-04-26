@@ -12,6 +12,15 @@ export interface IPathGenerator {
      * 應該初始化並計算所有玩家的完整路徑
      */
     createPaths(): void;
+    /**
+     * 產生所有玩家的基地棋子座標映射
+     */
+    createBaseMaps(): void;
+
+    /**
+     * 產生路徑與玩家基地座標的映射
+     */
+    createPathAndBaseMaps(): void;
     
     /**
      * 獲取所有玩家的路徑映射
@@ -26,6 +35,12 @@ export interface IPathGenerator {
      * @returns 該玩家的完整路徑座標陣列
      */
     getPlayerPath(playerType: number): number[][];
+    /**
+     * 獲取指定玩家的基地棋子座標
+     * @param playerType 玩家類型 (0:Blue, 1:Red, 2:Green, 3:Yellow)
+     * @returns 該玩家的基地棋子座標陣列
+     */
+    getPlayerBaseSlots(playerType: number): number[][];
 }
 
 /**
@@ -144,6 +159,113 @@ export interface IViewTransformer {
         startIndex: number, 
         steps: number
     ): number[][] | null;
+    
+    // === 基地坑位設置方法 ===
+    
+    /**
+     * 設定基地棋子座標內容
+     * 必須在使用基地坑位轉換功能前調用
+     * @param baseMap 所有玩家的基地座標映射
+     */
+    setBaseContent(baseMap: Record<number, number[][]>): void;
+    
+    /**
+     * 設定基地坑位 Slot ID 配置
+     * @param offset 坑位 ID 起始值（預設 -1）
+     * @param slotsPerPlayer 每個玩家的坑位數量（預設 4）
+     */
+    setBaseSlotConfig(offset: number, slotsPerPlayer: number): void;
+    
+    // === 基地坑位 Slot ID 轉換方法 ===
+    
+    /**
+     * 將 Slot ID 轉換為玩家類型和陣列索引
+     * @param slotId 坑位 ID（負數，如 -1, -2, ..., -16）
+     * @returns [玩家類型, 陣列索引]，如果 slotId 無效則返回 null
+     * 
+     * 轉換規則：
+     * - 藍色 (playerType=0): -1~-4 → 陣列索引 0~3
+     * - 紅色 (playerType=1): -5~-8 → 陣列索引 0~3
+     * - 綠色 (playerType=2): -9~-12 → 陣列索引 0~3
+     * - 黃色 (playerType=3): -13~-16 → 陣列索引 0~3
+     */
+    slotIdToIndex(slotId: number): [number, number] | null;
+    
+    /**
+     * 將玩家類型和陣列索引轉換為 Slot ID（反向轉換）
+     * @param playerType 玩家類型 (0:藍, 1:紅, 2:綠, 3:黃)
+     * @param arrayIndex 陣列索引 (0~3)
+     * @returns Slot ID（負數）
+     */
+    indexToSlotId(playerType: number, arrayIndex: number): number;
+    
+    // === 基地坑位視角轉換方法 ===
+    
+    /**
+     * 根據 Slot ID 獲取指定玩家視角下的基地坑位座標
+     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
+     * @param slotId 坑位 ID（負數，如 -1, -2, ..., -16）
+     * @returns 玩家視角下的基地坑位座標 [row, col]，如果找不到則返回 null
+     */
+    getBaseSlotInView(playerView: number, slotId: number): [number, number] | null;
+    
+    /**
+     * 以指定玩家的視角來看，獲取在這個視角下另一個玩家的基地坑位座標列表
+     * 
+     * @param playerType 玩家類型 (0:藍, 1:紅, 2:綠, 3:黃)-要取得哪個玩家的基地坑位
+     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
+     * @returns 玩家視角下的所有基地坑位座標陣列，如果找不到則返回 null
+     */
+    getSingleBaseSlotListByCurrentView(playerType: number, playerView: number): number[][] | null;
+
+    
+     /**
+     * 
+     * <以指定玩家的視角來看>:
+     * 透過slotId來取得這個視角下的基地坑位座標
+     * e.g:
+     * 玩家視角是黃色(3),要取得紅色(1)玩家的slotId=-6的基地坑位座標-5 ~ -8
+     * 就會換算旋轉下的座標回傳
+     * @param playerType 玩家類型 (0:藍, 1:紅, 2:綠, 3:黃)
+     * @param slotId 坑位 ID（負數，如 -1, -2, ..., -16）
+     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
+     * @returns 玩家視角下的基地坑位座標 [row, col]，如果找不到則返回 null
+     */
+    getBaseSlotByCurrentView(playerType: number, slotId: number, playerView: number): [number, number] | null;
+
+
+    /**
+     * 根據 Slot ID 獲取指定玩家視角下的基地坑位座標（自動從 Slot ID 換算玩家類型）
+     * 
+     * 此方法會自動從 Slot ID 計算出對應的玩家類型，無需手動傳入 playerType
+     * @param slotId 坑位 ID（負數，如 -1, -2, ..., -16）
+     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
+     * @returns 玩家視角下的基地坑位座標 [row, col]，如果找不到則返回 null
+     */
+    getBaseSlotInViewById(slotId: number, playerView: number): [number, number] | null ;
+    
+    
+    /**
+     * 根據 Slot ID 獲取指定玩家視角下的基地坑位座標（自動從 Slot ID 換算玩家類型）
+     * 
+     * 此方法會自動從 Slot ID 計算出對應的玩家類型，無需手動傳入 playerType
+     * 
+     * @param slotId 坑位 ID（負數，如 -1, -2, ..., -16）
+     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
+     * @returns 玩家視角下的基地坑位座標 [row, col]，如果找不到則返回 null
+     */
+    getBaseSlotInViewById(slotId: number, playerView: number): [number, number] | null;
+
+    /**
+     * 獲取所有玩家的基地坑位在某個視角下的座標
+     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
+     * @returns 所有玩家的基地坑位座標映射（按玩家類型分組），如果找不到則返回 null
+     */
+    getAllBaseSlotsByCurrentView(playerView: number): Record<number, number[][]> | null;
+    
+    
+    
+    
 }
 
 /**
@@ -160,6 +282,10 @@ export interface IPathConfig {
     outerPathLength?: number;
     //-內線路徑長度（可選）標準 Ludo 遊戲為 default 6 格
     innerPathLength?: number;
+    //-基地坑位 ID 起始值（可選）default -1
+    baseSlotIdOffset?: number;
+    //-每個玩家的坑位數量（可選）default 4
+    slotsPerPlayer?: number;
 }
 
 

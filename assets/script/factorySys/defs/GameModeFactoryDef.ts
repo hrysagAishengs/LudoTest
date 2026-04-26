@@ -80,14 +80,17 @@ export interface ISeatingConfig {
  * ```
  */
 export interface IGameModeConfig {
-    /** 遊戲模式類型 */
+    //遊戲模式類型
     gameMode: LudoGameMode;
     
-    /** 棋盤配置 */
+    //棋盤配置
     boardConfig: ICreateBoardConfig;
     
-    /** 路徑配置 */
+    //路徑配置
     pathConfig: IPathConfig;
+
+    //地圖裝飾配置
+    //mapDecorationConfig: any[]; // 根據實際情況替換為具體類型
     
     /** 玩家座位配置 */
     //seatingConfig: ISeatingConfig;

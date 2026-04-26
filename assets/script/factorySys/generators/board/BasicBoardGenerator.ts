@@ -71,7 +71,7 @@ export class BasicBoardGenerator implements IBoardGenerator{
        });
     }
 
-    // 提供一個公開方法，讓 Pawn 調用座標
+    // 讓 Pawn 調用座標
     public getCellPosition(r: number, c: number): Vec3 {
         // 如果有實際節點，返回節點位置；否則返回預計算的座標
         if(this._cells.length > 0 && this._cells[r] && this._cells[r][c]){
@@ -80,11 +80,57 @@ export class BasicBoardGenerator implements IBoardGenerator{
         return this._cellPositions[r]?.[c] || new Vec3(0, 0, 0);
     }
 
+    /**
+     * 獲取玩家基地坑位的位置座標(放置旗子的地方)
+     * 獲取基地坑位的座標
+     * @param r 較小的 row 索引 (例如 1)
+     * @param c 較小的 col 索引 (例如 1)
+     */
+    public getBaseSlotPosition(r: number, c: number):Vec3{
+        // 先取出左下角那一格的中心座標
+        const basePos = this.getCellPosition(r, c);
+        // 向右偏移半格，向上偏移半格，即為四格交會的中心點
+        const halfCell = this._cellSize / 2; // (因為預設基礎單位是 48)
+        return new Vec3(basePos.x + halfCell, basePos.y + halfCell, basePos.z);
+    }
+
+    public getAllBaseSlotPositions(): Vec3[][] {
+        /**
+         *  blue (左下)：傳入 (1, 1), (1, 3), (3, 1), (3, 3)
+            red (左上)：傳入 (10, 1), (10, 3), (12, 1), (12, 3)
+            green (右上)：傳入 (10, 10), (10, 12), (12, 10), (12, 12)
+            yellow (右下)：傳入 (1, 10), (1, 12), (3, 10), (3, 12)
+            這是四個玩家基地坑位的中心點座標，對應棋盤上的四格交會處，適合放置旗子等遊戲元素
+         */
+        const baseSlotPositions: Vec3[][] = [];
+        const baseCoords = [
+            [[1, 1], [1, 3], [3, 1], [3, 3]], // blue
+            [[10, 1], [10, 3], [12, 1], [12, 3]], // red
+            [[10, 10], [10, 12], [12, 10], [12, 12]], // green
+            [[1, 10], [1, 12], [3, 10], [3, 12]] // yellow
+        ];
+        for (const playerSlots of baseCoords) {
+            const playerBasePositions: Vec3[] = [];
+            for (const [r, c] of playerSlots) {
+                playerBasePositions.push(this.getBaseSlotPosition(r, c));
+            }
+            baseSlotPositions.push(playerBasePositions);
+        }
+        return baseSlotPositions;
+    }
      /**
      * 獲取全部棋盤座標陣列
      */
     public getAllPositions(): Vec3[][] {
         return this._cellPositions;
+    }
+    
+    /**
+     * 獲取全部棋盤節點陣列（用於地圖管理）
+     * @returns 節點二維陣列
+     */
+    public getAllCells(): Node[][] {
+        return this._cells;
     }
 
     public getGridSize(): number {
@@ -217,6 +263,7 @@ export class BasicBoardGenerator implements IBoardGenerator{
        
         for (let r = 0; r < this._gridSize; r++) {
             this._cells[r] = [];
+            this._cellPositions[r] = [];
             for (let c = 0; c < this._gridSize; c++) {
                 // 創建空節點
                 const cell = new Node(`Cell_${r}_${c}`);
@@ -233,6 +280,7 @@ export class BasicBoardGenerator implements IBoardGenerator{
                 cell.setPosition(posX, posY, 0);
                 
                 this._cells[r][c] = cell;
+                this._cellPositions[r][c] = new Vec3(posX, posY, 0);
             }
         }
         
