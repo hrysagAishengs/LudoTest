@@ -23,6 +23,17 @@ export enum GameModePropertyType {
 Enum(GameModePropertyType);
 
 /**
+ * 定義常見的桌型名稱，方便在面板快速選擇
+ */
+export enum TableTypeTag {
+    TWO_PLAYER_MINI = 0,
+    FOUR_PLAYER_CLASSIC = 1,
+    SIX_PLAYER_DELUXE = 2,
+    CUSTOM = 3
+}
+Enum(TableTypeTag);
+
+/**
  * 棋盤配置組
  * 包含棋盤相關的所有配置參數（資源 + 邏輯）
  */
@@ -391,6 +402,106 @@ export class PathConfigGroup {
     }
 }
 
+
+/**
+ * 單個座位的詳細配置
+ * 用於定義 15x15 網格中的基地範圍
+ */
+@ccclass('SeatAreaConfig')
+export class SeatAreaConfig {
+    @property({ 
+        type: CCInteger, 
+        displayName: '座位索引', 
+        tooltip: '對應玩家編號 (0=Blue, 1=Red, 2=Green, 3=Yellow)' 
+    })
+    public seatIndex: number = 0;
+
+    // --- 區域定義 (15x15 網格中的範圍) ---
+    @property({ type: CCInteger, displayName: '起始 Row (Y)' })
+    public startRow: number = 0;
+
+    @property({ type: CCInteger, displayName: '起始 Col (X)' })
+    public startCol: number = 0;
+
+    @property({ type: CCInteger, displayName: '區域寬度' })
+    public width: number = 6;
+
+    @property({ type: CCInteger, displayName: '區域高度' })
+    public height: number = 6;
+
+    /**
+     * 判定某個網格座標是否屬於此座位區域
+     */
+    public isInside(row: number, col: number): boolean {
+        return row >= this.startRow && row < this.startRow + this.height &&
+               col >= this.startCol && col < this.startCol + this.width;
+    }
+}
+
+@ccclass('SeatConfigGroup')
+export class SeatConfigGroup {
+
+    @property({
+        type: Enum(TableTypeTag),
+        displayName: '桌型標籤',
+        tooltip: '在配置列表裡方便一眼看出這是什麼模式的設定'
+    })
+    public tableTag: TableTypeTag = TableTypeTag.FOUR_PLAYER_CLASSIC;
+
+    // ========== 開局人數配置 (與陣列長度連動) ==========
+
+    @property
+    private _activePlayerCount: number = 4;
+
+    @property({
+        type: CCInteger,
+        displayName: '開局人數 (Mode)',
+        tooltip: '此模式實際開啟的玩家人數，會自動增減下方的座位配置數量',
+        range: [1, 6, 1]
+    })
+    set activePlayerCount(value: number) {
+        this._activePlayerCount = value;
+
+        // --- 自動調整 seats 陣列長度 ---
+        if (this.seats.length < value) {
+            const diff = value - this.seats.length;
+            for (let i = 0; i < diff; i++) {
+                const newSeat = new SeatAreaConfig();
+                // 根據當前陣列長度自動賦予預設索引
+                newSeat.seatIndex = this.seats.length;
+                this.seats.push(newSeat);
+            }
+        } else if (this.seats.length > value) {
+            this.seats.length = value;
+        }
+    }
+
+    get activePlayerCount() {
+        return this._activePlayerCount;
+    }
+
+    // ========== 座位詳細設定 ==========
+
+    @property({
+        type: [SeatAreaConfig],
+        displayName: '啟用座位列表',
+        tooltip: '此列表中的座位即為開啟狀態，未列出的則視為關閉/反灰'
+    })
+    public seats: SeatAreaConfig[] = [
+        new SeatAreaConfig(),
+        new SeatAreaConfig(),
+        new SeatAreaConfig(),
+        new SeatAreaConfig()
+    ];
+
+    /**
+     * 獲取目前啟用的玩家索引列表 (例如 [0, 2])
+     */
+    public getActiveIndices(): number[] {
+        return this.seats.map(s => s.seatIndex);
+    }
+}
+
 /**
  * 遊戲模式配置
  * 可在 Cocos Creator 編輯器面板上設定，用於生成 IGameModeConfig
@@ -428,9 +539,9 @@ export class GameModeConfig {
 
     @property({ 
         type: [RoomConfigGroup],
-        tooltip: '房間配置（玩家數量和座位配置）'
+        tooltip: '房間玩家面板配置（玩家數量和面板配置）'
     })
-    roomConfig: RoomConfigGroup[] = [new RoomConfigGroup()];
+    roomPanelConfig: RoomConfigGroup[] = [new RoomConfigGroup()];
     
     @property({ 
         type: [MapDecorationConfigGroup],
@@ -438,6 +549,11 @@ export class GameModeConfig {
     })
     mapDecorationConfig: MapDecorationConfigGroup[] = [new MapDecorationConfigGroup()];
     
+    @property({ 
+        type: [SeatConfigGroup],
+        tooltip: '棋盤座位配置（玩家基地範圍和位置設定）'
+    })
+    boardBaseConfig: SeatConfigGroup[] = [new SeatConfigGroup()];
     /**
      * 轉換為 IGameModeConfig 介面
      * 用於傳遞給工廠類

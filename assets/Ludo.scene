@@ -23,7 +23,7 @@
     "_active": true,
     "_components": [],
     "_prefab": {
-      "__id__": 31
+      "__id__": 36
     },
     "_lpos": {
       "__type__": "cc.Vec3",
@@ -54,7 +54,7 @@
     },
     "autoReleaseAssets": false,
     "_globals": {
-      "__id__": 32
+      "__id__": 37
     },
     "_id": "777ce4cd-d94b-44f5-a75e-5035ab97d671"
   },
@@ -77,16 +77,16 @@
     "_active": true,
     "_components": [
       {
-        "__id__": 27
+        "__id__": 32
       },
       {
-        "__id__": 28
+        "__id__": 33
       },
       {
-        "__id__": 29
+        "__id__": 34
       },
       {
-        "__id__": 30
+        "__id__": 35
       }
     ],
     "_prefab": null,
@@ -178,7 +178,7 @@
     "_priority": 0,
     "_fov": 45,
     "_fovAxis": 0,
-    "_orthoHeight": 450.01367989056087,
+    "_orthoHeight": 531.437802907916,
     "_near": 0,
     "_far": 2000,
     "_color": {
@@ -649,7 +649,7 @@
     "pathConfig": {
       "__id__": 20
     },
-    "roomConfig": [
+    "roomPanelConfig": [
       {
         "__id__": 21
       },
@@ -669,6 +669,11 @@
       },
       {
         "__id__": 26
+      }
+    ],
+    "boardBaseConfig": [
+      {
+        "__id__": 27
       }
     ]
   },
@@ -958,6 +963,57 @@
     "arrowSize": 0
   },
   {
+    "__type__": "SeatConfigGroup",
+    "tableTag": 1,
+    "_activePlayerCount": 4,
+    "seats": [
+      {
+        "__id__": 28
+      },
+      {
+        "__id__": 29
+      },
+      {
+        "__id__": 30
+      },
+      {
+        "__id__": 31
+      }
+    ]
+  },
+  {
+    "__type__": "SeatAreaConfig",
+    "seatIndex": 0,
+    "startRow": 0,
+    "startCol": 0,
+    "width": 6,
+    "height": 6
+  },
+  {
+    "__type__": "SeatAreaConfig",
+    "seatIndex": 0,
+    "startRow": 0,
+    "startCol": 0,
+    "width": 6,
+    "height": 6
+  },
+  {
+    "__type__": "SeatAreaConfig",
+    "seatIndex": 0,
+    "startRow": 0,
+    "startCol": 0,
+    "width": 6,
+    "height": 6
+  },
+  {
+    "__type__": "SeatAreaConfig",
+    "seatIndex": 0,
+    "startRow": 0,
+    "startCol": 0,
+    "width": 6,
+    "height": 6
+  },
+  {
     "__type__": "cc.UITransform",
     "_name": "",
     "_objFlags": 0,
@@ -1051,28 +1107,28 @@
   {
     "__type__": "cc.SceneGlobals",
     "ambient": {
-      "__id__": 33
-    },
-    "shadows": {
-      "__id__": 34
-    },
-    "_skybox": {
-      "__id__": 35
-    },
-    "fog": {
-      "__id__": 36
-    },
-    "octree": {
-      "__id__": 37
-    },
-    "skin": {
       "__id__": 38
     },
-    "lightProbeInfo": {
+    "shadows": {
       "__id__": 39
     },
-    "postSettings": {
+    "_skybox": {
       "__id__": 40
+    },
+    "fog": {
+      "__id__": 41
+    },
+    "octree": {
+      "__id__": 42
+    },
+    "skin": {
+      "__id__": 43
+    },
+    "lightProbeInfo": {
+      "__id__": 44
+    },
+    "postSettings": {
+      "__id__": 45
     },
     "bakedWithStationaryMainLight": false,
     "bakedWithHighpLightmap": false

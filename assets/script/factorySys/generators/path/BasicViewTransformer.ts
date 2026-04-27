@@ -87,6 +87,15 @@ export class BasicViewTransformer implements IViewTransformer {
      * 2. 應用區塊級旋轉
      * 3. 轉換到目標區塊的絕對座標
      * 
+     * 基本盤坐標順序（左上、右上、左下、右下）：
+     * - Blue(0):   [3,1], [3,3], [1,1], [1,3]    -> slotId -1~-4
+     * - Red(1):    [12,1], [12,3], [10,1], [10,3] -> slotId -5~-8
+     * - Green(2):  [12,10], [12,12], [10,10], [10,12] -> slotId -9~-12
+     * - Yellow(3): [3,10], [3,12], [1,10], [1,12]  -> slotId -13~-16
+     * 
+     * 範例：在 Yellow(3) 視角下，Red 的坑位轉換為：
+     * - [12,1] -> [12,12], [12,3] -> [10,12], [10,1] -> [12,10], [10,3] -> [10,10]
+     * 
      * @param row 基本盤的 row 座標
      * @param col 基本盤的 col 座標
      * @param currentPlayer 當前在左下角的玩家 (0:Blue, 1:Red, 2:Green, 3:Yellow)

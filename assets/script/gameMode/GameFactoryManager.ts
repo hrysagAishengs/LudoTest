@@ -167,9 +167,9 @@ export class GameFactoryManager extends Component {
         const editorConfig = this._gameModeConfig.find(c => c.gameMode === propertyMode);
         
          console.log(`[GameFactoryManager] 找到配置:`, editorConfig ? '是' : '否');
-        console.log(`[GameFactoryManager] roomConfig 存在:`, editorConfig?.roomConfig ? '是' : '否');
-        console.log(`[GameFactoryManager] roomConfig 長度:`, editorConfig?.roomConfig?.length);
-        if (!editorConfig || !editorConfig.roomConfig || editorConfig.roomConfig.length === 0) {
+        console.log(`[GameFactoryManager] roomPanelConfig 存在:`, editorConfig?.roomPanelConfig ? '是' : '否');
+        console.log(`[GameFactoryManager] roomPanelConfig 長度:`, editorConfig?.roomPanelConfig?.length);
+        if (!editorConfig || !editorConfig.roomPanelConfig || editorConfig.roomPanelConfig.length === 0) {
             console.error('[GameFactoryManager] 未找到房間配置');
             return;
         }
@@ -184,7 +184,7 @@ export class GameFactoryManager extends Component {
         this._roomPlayerManager = new RoomPlayerManager();
         
         // 從配置初始化
-        this._roomPlayerManager.initializeFromConfig(editorConfig.roomConfig, playerCount);
+        this._roomPlayerManager.initializeFromConfig(editorConfig.roomPanelConfig, playerCount);
         
         console.log('[GameFactoryManager] 房間管理器初始化完成');
     }

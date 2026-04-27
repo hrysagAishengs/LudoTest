@@ -84,7 +84,7 @@ export class LudoGameManager extends Component {
 
     public testPathMode(): void {
         
-        const playerType = 1// 0: Blue, 1: Red, 2: Green, 3: Yellow
+        const playerType = 2// 0: Blue, 1: Red, 2: Green, 3: Yellow
         const roomMaxPlayerCount = 4;
         this.setupRoom(roomMaxPlayerCount);
         this.rotateBoardView(playerType);
@@ -100,7 +100,8 @@ export class LudoGameManager extends Component {
         const otherPlayerSegment = this.getOtherPlayerDestToGlobalSegment(playerType, 1, 0, 9);
 
         console.log('testSegment',otherPlayerSegment);
-        const drawPos=this.getCellPosition(otherPlayerDestination[0],otherPlayerDestination[1]);
+        //const drawPos=this.getCellPosition(otherPlayerDestination[0],otherPlayerDestination[1]);
+        
         
         //console.log(`Player ${playerType} path segment from [1, 6] moving 5 steps:`, playerPathSegment);
         //const pos=this.getCellPosition(playerDes[0],playerDes[1]);
@@ -108,6 +109,8 @@ export class LudoGameManager extends Component {
         //const pos=this.getCellPosition(test[0],test[1]);
         //this.testDraw(pos);
 
+        const slotPos=this.getPlayerBSToGlobalByCurrentView(1, -8, playerType);
+        const drawPos=this.getBaseSlotPosition(slotPos[0],slotPos[1]);
         //const slotPos=this.getPlayerBSToGlobalByCurrentView(0, -1, playerType);
         //const slotPos=this.getPlayerBSToGlobalByCurrentView(0, -1, playerType);    
         //const slotPos=this.getOtherPlayerBSByIdToGlobal(-1, playerType);
