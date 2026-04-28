@@ -49,12 +49,17 @@ export class BasicPathGenerator implements IPathGenerator {
     
     private _pathMap: Record<number, number[][]> = {};
     private _baseMap: Record<number, number[][]> = {};
+    private _slotIdMap: Record<number, number[]> = {};  // 🆕 存儲每個玩家的 SlotID 陣列
     
     // 硬編碼配置（當前實現限制）
     private readonly GRID_SIZE = 15;  // 路徑座標為 15×15 棋盤設計，不可更改
     
     // 可配置參數
     private _playerCount: number = 4;  // 預設 4 人遊戲
+    
+    // SlotID 配置
+    private _baseSlotIdOffset: number = -1;  // 坑位 ID 起始值（預設 -1）
+    private _slotsPerPlayer: number = 4;      // 每個玩家的坑位數量（預設 4）
     
     /**
      * 設置路徑配置
@@ -67,6 +72,13 @@ export class BasicPathGenerator implements IPathGenerator {
      * @param config 路徑配置
      */
     public setConfig(config: IPathConfig): void {
+        // 接收 SlotID 配置
+        if (config.baseSlotIdOffset !== undefined) {
+            this._baseSlotIdOffset = config.baseSlotIdOffset;
+        }
+        if (config.slotsPerPlayer !== undefined) {
+            this._slotsPerPlayer = config.slotsPerPlayer;
+        }
         // 驗證 gridSize
         if (config.gridSize !== undefined && config.gridSize !== 15) {
             console.warn(
@@ -130,10 +142,18 @@ export class BasicPathGenerator implements IPathGenerator {
             this._baseMap[playerType] = BLUE_BASE_SLOTS.map(coord => 
                 this.translateBaseCoords(coord[0], coord[1], playerType)
             );
+            
+            // 🆕 同時生成 SlotID 陣列
+            const startSlotId = this._baseSlotIdOffset - (playerType * this._slotsPerPlayer);
+            this._slotIdMap[playerType] = Array.from(
+                { length: this._slotsPerPlayer }, 
+                (_, i) => startSlotId - i
+            );
         }
         
         console.log(`基地座標生成完成：共 ${this._playerCount} 玩家，每個基地 ${BLUE_BASE_SLOTS.length} 個坑位`);
         console.log('all base maps:', this._baseMap);
+        console.log('all slot ID maps:', this._slotIdMap);
     }
     //--兩個一起產生
     public createPathAndBaseMaps(): void {
@@ -170,6 +190,48 @@ export class BasicPathGenerator implements IPathGenerator {
             return [];
         }
         return this._baseMap[playerType];
+    }
+
+    /**
+     * 獲取所有玩家的 Slot ID 映射
+     * @returns 玩家類型 -> Slot ID 陣列的映射
+     *          例如: { 0: [-1,-2,-3,-4], 1: [-5,-6,-7,-8], ... }
+     */
+    public getSlotIdMap(): Record<number, number[]> {
+        return this._slotIdMap;
+    }
+
+    /**
+     * 獲取指定玩家的所有 Slot ID
+     * @param playerType 玩家類型 (0:藍, 1:紅, 2:綠, 3:黃)
+     * @returns 該玩家的 Slot ID 陣列，如 [-1, -2, -3, -4]
+     */
+    public getPlayerSlotIds(playerType: number): number[] {
+        if (!this._slotIdMap[playerType]) {
+            console.warn(`玩家 ${playerType} 的 Slot ID 不存在`);
+            return [];
+        }
+        return this._slotIdMap[playerType];
+    }
+
+    /**
+     * 根據 Slot ID 反查玩家類型和陣列索引
+     * @param slotId 坑位 ID（負數，如 -1, -2, ..., -16）
+     * @returns { playerType: 玩家類型, index: 在該玩家陣列中的索引 }，如果找不到則返回 null
+     * 
+     * 範例：
+     * - slotId = -2 → { playerType: 0, index: 1 }  (Blue 的第 2 個坑位)
+     * - slotId = -6 → { playerType: 1, index: 1 }  (Red 的第 2 個坑位)
+     */
+    public getSlotInfo(slotId: number): { playerType: number, index: number } | null {
+        for (const playerType in this._slotIdMap) {
+            const slots = this._slotIdMap[playerType];
+            const index = slots.indexOf(slotId);
+            if (index !== -1) {
+                return { playerType: Number(playerType), index };
+            }
+        }
+        return null;
     }
 
     /**

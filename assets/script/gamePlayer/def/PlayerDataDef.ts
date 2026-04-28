@@ -1,5 +1,6 @@
 import { SpriteFrame } from "cc";
 import { PlayerPanel } from "../PlayerPanel";
+import { PlayerColor } from "../ColorSelector";
 
 /**
  * 玩家靜態身分
@@ -12,8 +13,10 @@ export interface IPlayerIdentity {
     nickname: string;
     /** 玩家頭像圖片 */
     avatarSpriteFrame: SpriteFrame | null;
-    /** 原始座位編號 (0:藍, 1:紅, 2:綠, 3:黃) */
+    /** 原始座位編號 (Server 分配) */
     seatIndex: number;
+    /** 棋盤顏色（客戶端隨機分配：0=Blue, 1=Red, 2=Green, 3=Yellow） */
+    playerColor?: PlayerColor;
 }
 
 /**

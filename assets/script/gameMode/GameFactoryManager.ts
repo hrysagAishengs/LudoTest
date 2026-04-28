@@ -349,8 +349,33 @@ export class GameFactoryManager extends Component {
         }
         // 重置面板到基本盤位置（已通過 rotateBoardView(0) 完成）
         console.log('[GameFactoryManager] 棋盤視角已重置到默認狀態');
-    }
-    
+    }    
+    /**
+     * 設置本機玩家視角（本機玩家入桌時調用）
+     * 根據本機玩家的座位索引，自動旋轉棋盤到對應視角
+     * 
+     * @param localPlayerSeatIndex - 本機玩家的座位索引（Server 單獨通知）
+     */
+    public setupLocalPlayerView(localPlayerSeatIndex: number): void {
+        if (!this._roomPlayerManager) {
+            console.error('[GameFactoryManager] RoomPlayerManager 未初始化，無法設置本機玩家視角');
+            return;
+        }
+        
+        // 從房間管理器獲取本機玩家的棋盤顏色
+        const playerColor = this._roomPlayerManager.getLocalPlayerColor(localPlayerSeatIndex);
+        
+        if (playerColor === undefined) {
+            console.error(`[GameFactoryManager] 無法獲取座位 ${localPlayerSeatIndex} 的棋盤顏色`);
+            return;
+        }
+        
+        // 根據棋盤顏色旋轉視角
+        // PlayerColor 枚舉值 (0:Blue, 1:Red, 2:Green, 3:Yellow) 剛好對應 rotateBoardView 參數
+        this.rotateBoardView(playerColor);
+        
+        console.log(`[GameFactoryManager] 本機玩家視角設置完成 (座位 ${localPlayerSeatIndex})`);
+    }    
     // ========== 組件訪問 API ==========
     
     /**

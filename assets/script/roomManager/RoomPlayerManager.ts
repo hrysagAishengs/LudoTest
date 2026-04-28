@@ -2,6 +2,7 @@ import { Node, Prefab, instantiate, Vec3 } from "cc";
 import { IPlayerEntity, IPlayerIdentity, IPlayerStatus } from "../gamePlayer/def/PlayerDataDef";
 import { PlayerPanel } from "../gamePlayer/PlayerPanel";
 import { RoomConfigGroup } from "../factorySys/component/ConfigProperty";
+import { ColorSelector, PlayerColor } from "../gamePlayer/ColorSelector";
 
 /**
  * 房間玩家管理器
@@ -20,6 +21,12 @@ export class RoomPlayerManager {
     
     /** 當前視角的玩家索引 (0:Blue, 1:Red, 2:Green, 3:Yellow) */
     private _currentViewPlayerIndex: number = 0;
+    
+    /** 顏色選擇器（房間初始化時隨機分配顏色） */
+    private _colorSelector: ColorSelector = new ColorSelector();
+    
+    /** 座位到棋盤顏色的映射 (seatIndex → PlayerColor)，房間初始化時隨機分配 */
+    private _seatColorMap: Map<number, PlayerColor> = new Map();
 
     /**
      * 從配置初始化房間面板
@@ -56,6 +63,10 @@ export class RoomPlayerManager {
         
         // 清空舊面板
         this._clearPanels();
+        
+        // 🎨 隨機分配所有座位的棋盤顏色（Server 給座位 index，客戶端隨機決定使用哪種顏色）
+        this._seatColorMap = this._colorSelector.randomAssignColors(playerCount);
+        console.log(`[RoomPlayerManager] 座位顏色分配完成：${this._getSeatColorSummary()}`);
         
         // 根據 chairs 動態生成面板
         // 索引對應玩家顏色: 0:Blue, 1:Red, 2:Green, 3:Yellow
@@ -216,6 +227,19 @@ export class RoomPlayerManager {
         if (this._activePlayers.has(identity.seatIndex)) {
             console.warn(`座位 ${identity.seatIndex} 已有玩家，將被覆蓋`);
         }
+        
+        // 🎨 從預分配的映射中獲取玩家棋盤顏色
+        const playerColor = this._seatColorMap.get(identity.seatIndex);
+        if (playerColor === undefined) {
+            console.error(`座位 ${identity.seatIndex} 沒有預分配顏色，請先初始化房間`);
+            return;
+        }
+        
+        // 將顏色寫入玩家身份資訊
+        identity.playerColor = playerColor;
+        
+        const colorName = ColorSelector.getColorNameByEnum(playerColor);
+        console.log(`[RoomPlayerManager] 玩家 "${identity.nickname}" (座位 ${identity.seatIndex}) 使用棋盤顏色: ${colorName}`);
 
         const player: IPlayerEntity = {
             identity: identity,
@@ -310,7 +334,48 @@ export class RoomPlayerManager {
         // 清空 Map
         this._activePlayers.clear();
         
+        // 清空顏色映射
+        this._seatColorMap.clear();
+        this._colorSelector.reset();
+        
         console.log('房間已清空');
+    }
+    
+    /**
+     * 獲取座位的棋盤顏色
+     * @param seatIndex - 座位索引
+     * @returns 棋盤顏色，若未分配則返回 undefined
+     */
+    public getSeatColor(seatIndex: number): PlayerColor | undefined {
+        return this._seatColorMap.get(seatIndex);
+    }
+    
+    /**
+     * 獲取所有座位的棋盤顏色映射
+     * @returns 座位顏色映射的副本
+     */
+    public getAllSeatColors(): Map<number, PlayerColor> {
+        return new Map(this._seatColorMap);
+    }
+    
+    /**
+     * 設置本機玩家視角（本機玩家入桌時調用）
+     * 返回需要旋轉的棋盤顏色，由外部調用 rotateBoardView
+     * 
+     * @param localPlayerSeatIndex - 本機玩家的座位索引
+     * @returns 本機玩家的棋盤顏色，若失敗則返回 undefined
+     */
+    public getLocalPlayerColor(localPlayerSeatIndex: number): PlayerColor | undefined {
+        const color = this._seatColorMap.get(localPlayerSeatIndex);
+        if (color === undefined) {
+            console.error(`[RoomPlayerManager] 無法獲取座位 ${localPlayerSeatIndex} 的顏色`);
+            return undefined;
+        }
+        
+        const colorName = ColorSelector.getColorNameByEnum(color);
+        console.log(`[RoomPlayerManager] 本機玩家座位 ${localPlayerSeatIndex}，棋盤顏色: ${colorName}`);
+        
+        return color;
     }
 
     /**
@@ -330,6 +395,20 @@ export class RoomPlayerManager {
     }
 
     // ==================== 私有輔助方法 ====================
+    
+    /**
+     * 獲取座位顏色分配摘要（用於日誌）
+     * @returns 顏色分配摘要字串
+     * @private
+     */
+    private _getSeatColorSummary(): string {
+        const summary: string[] = [];
+        this._seatColorMap.forEach((color, seat) => {
+            const colorName = ColorSelector.getColorNameByEnum(color);
+            summary.push(`${seat}→${colorName}`);
+        });
+        return summary.join(', ');
+    }
 
     /**
      * 根據狀態更新更新對應的 UI

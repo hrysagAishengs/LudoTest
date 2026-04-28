@@ -14,6 +14,7 @@ export class BasicViewTransformer implements IViewTransformer {
     private readonly BOARD_MAX_INDEX = 14; // 15x15 棋盤的最大索引
     private _pathMap: Record<number, number[][]> | null = null;
     private _baseMap: Record<number, number[][]> | null = null;
+    private _slotIdMap: Record<number, number[]> | null = null;  // 🆕 存儲每個玩家的 SlotID 陣列
     
     // 基地坑位 Slot ID 配置
     private _baseSlotIdOffset: number = -1;  // 坑位 ID 起始值（預設 -1）
@@ -43,6 +44,14 @@ export class BasicViewTransformer implements IViewTransformer {
     public setBaseSlotConfig(offset: number, slotsPerPlayer: number): void {
         this._baseSlotIdOffset = offset;
         this._slotsPerPlayer = slotsPerPlayer;
+    }
+
+    /**
+     * 設置 Slot ID 映射表
+     * @param slotIdMap 所有玩家的 Slot ID 映射
+     */
+    public setSlotIdMap(slotIdMap: Record<number, number[]>): void {
+        this._slotIdMap = slotIdMap;
     }
 
     // ========== 座標轉換方法 ==========
@@ -530,7 +539,39 @@ export class BasicViewTransformer implements IViewTransformer {
         return result;
     }
 
-   
+    // ========== Slot ID 查詢方法 ==========
 
-   
+    /**
+     * 獲取指定玩家的所有 Slot ID
+     * @param playerType 玩家類型 (0:藍, 1:紅, 2:綠, 3:黃)
+     * @returns 該玩家的 Slot ID 陣列，如 [-1, -2, -3, -4]，如果找不到則返回 null
+     */
+    public getPlayerSlotIds(playerType: number): number[] | null {
+        if (!this._slotIdMap || !this._slotIdMap[playerType]) {
+            return null;
+        }
+        return this._slotIdMap[playerType];
+    }
+
+    /**
+     * 根據 Slot ID 反查玩家類型和陣列索引
+     * @param slotId 坑位 ID（負數，如 -1, -2, ..., -16）
+     * @returns { playerType: 玩家類型, index: 在該玩家陣列中的索引 }，如果找不到則返回 null
+     * 
+     * 範例：
+     * - slotId = -2 → { playerType: 0, index: 1 }  (Blue 的第 2 個坑位)
+     * - slotId = -6 → { playerType: 1, index: 1 }  (Red 的第 2 個坑位)
+     */
+    public getSlotInfo(slotId: number): { playerType: number, index: number } | null {
+        if (!this._slotIdMap) return null;
+        
+        for (const playerType in this._slotIdMap) {
+            const slots = this._slotIdMap[playerType];
+            const index = slots.indexOf(slotId);
+            if (index !== -1) {
+                return { playerType: Number(playerType), index };
+            }
+        }
+        return null;
+    }
 }

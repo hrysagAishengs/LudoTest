@@ -63,6 +63,24 @@ export class LudoGameManager extends Component {
         this._factoryManager.setupRoom(playerCount);
         console.log(`[LudoGameManager] 房間設置完成：${playerCount} 人局`);
     }
+    
+    /**
+     * 設置本機玩家視角（本機玩家入桌時調用）
+     * 當收到 Server 通知"你是座位 X"時調用此方法，自動旋轉棋盤到對應視角
+     * 
+     * @param localPlayerSeatIndex - 本機玩家的座位索引（Server 單獨通知）
+     * 
+     * 使用範例：
+     * ```typescript
+     * // Server 通知：你是座位 2
+     * ludoGameManager.setupLocalPlayerView(2);
+     * // → 自動旋轉棋盤到座位 2 對應的顏色視角
+     * ```
+     */
+    public setupLocalPlayerView(localPlayerSeatIndex: number): void {
+        this._factoryManager.setupLocalPlayerView(localPlayerSeatIndex);
+        console.log(`[LudoGameManager] 本機玩家視角設置完成 (座位 ${localPlayerSeatIndex})`);
+    }
 
     /**
      * @deprecated 使用 initGame 代替
@@ -118,6 +136,46 @@ export class LudoGameManager extends Component {
 
         
         this.testDraw(drawPos);
+        
+        // ========== 測試：Slot ID 查詢功能 ==========
+        console.log('=== 測試 Slot ID 查詢功能 ===');
+        
+        // 測試 1：獲取每個玩家的 Slot ID 陣列
+        console.log('各玩家的 Slot ID:');
+        for (let i = 0; i < 4; i++) {
+            const slotIds = this.getPlayerSlotIds(i);
+            const playerNames = ['Blue', 'Red', 'Green', 'Yellow'];
+            console.log(`  ${playerNames[i]} (${i}):`, slotIds);
+        }
+        
+        // 測試 2：反查 Slot ID 的信息
+        console.log('\nSlot ID 反查測試:');
+        const testSlotIds = [-1, -2, -5, -6, -10, -13, -16];
+        testSlotIds.forEach(slotId => {
+            const info = this.getSlotInfo(slotId);
+            if (info) {
+                const playerNames = ['Blue', 'Red', 'Green', 'Yellow'];
+                console.log(`  SlotID ${slotId} -> ${playerNames[info.playerType]} (playerType=${info.playerType}, index=${info.index})`);
+            }
+        });
+        
+        // 測試 3：模擬實際使用場景
+        console.log('\n模擬點擊棋子場景:');
+        const clickedSlotId = -6;  // 假設玩家點擊了 Red 的第 2 個棋子
+        const clickedInfo = this.getSlotInfo(clickedSlotId);
+        if (clickedInfo) {
+            const playerNames = ['Blue', 'Red', 'Green', 'Yellow'];
+            console.log(`  玩家點擊了: ${playerNames[clickedInfo.playerType]} 的第 ${clickedInfo.index + 1} 個棋子`);
+            console.log(`  可發送給 Server: { playerId: ${clickedInfo.playerType}, pieceIndex: ${clickedInfo.index} }`);
+            
+            // 進一步獲取該坑位在當前視角下的座標
+            const slotCoord = this.getPlayerBSToGlobalByCurrentView(clickedInfo.playerType, clickedSlotId, playerType);
+            if (slotCoord) {
+                console.log(`  該棋子在視角 ${playerType} 下的座標: [${slotCoord[0]}, ${slotCoord[1]}]`);
+            }
+        }
+        
+        console.log('=== Slot ID 測試完成 ===\n');
         
         // ========== 測試：視角坐標轉換與地圖查詢 ==========
         console.log('=== 測試視角坐標轉換與地圖查詢 ===');
@@ -449,6 +507,117 @@ export class LudoGameManager extends Component {
      */
     public getAllBSListByCurrentView(playerView: number): Record<number, number[][]> | null {
         return this._factoryManager.getViewTransformer()?.getAllBaseSlotsByCurrentView(playerView) ?? null;
+    }
+
+    // ========== Slot ID 查詢 API ==========
+
+    /**
+     * 獲取指定玩家的所有 Slot ID
+     * 
+     * @param playerType 玩家類型 (0:Blue, 1:Red, 2:Green, 3:Yellow)
+     * @returns 該玩家的 Slot ID 陣列，如 [-1, -2, -3, -4]
+     * 
+     * 範例：
+     * ```typescript
+     * const blueSlots = ludoGameManager.getPlayerSlotIds(0);
+     * // 返回 [-1, -2, -3, -4]
+     * 
+     * const redSlots = ludoGameManager.getPlayerSlotIds(1);
+     * // 返回 [-5, -6, -7, -8]
+     * ```
+     */
+    public getPlayerSlotIds(playerType: number): number[] | null {
+        return this._factoryManager.getViewTransformer()?.getPlayerSlotIds(playerType) ?? null;
+    }
+
+    /**
+     * 根據 Slot ID 反查玩家類型和在該玩家陣列中的索引
+     * 
+     * @param slotId 坑位 ID（負數，如 -1, -2, ..., -16）
+     * @returns { playerType: 玩家類型, index: 在該玩家陣列中的索引 }，如果找不到則返回 null
+     * 
+     * 範例：
+     * ```typescript
+     * // 查詢 -2 屬於哪個玩家的第幾個坑位
+     * const info = ludoGameManager.getSlotInfo(-2);
+     * // 返回 { playerType: 0, index: 1 }  (Blue 的第 2 個坑位，索引從 0 開始)
+     * 
+     * // 查詢 -6 屬於哪個玩家
+     * const info2 = ludoGameManager.getSlotInfo(-6);
+     * // 返回 { playerType: 1, index: 1 }  (Red 的第 2 個坑位)
+     * 
+     * // 用於 Server 通信：當玩家點擊某個棋子時
+     * const clickedSlotId = -3;
+     * const slotInfo = ludoGameManager.getSlotInfo(clickedSlotId);
+     * if (slotInfo) {
+     *     console.log(`玩家 ${slotInfo.playerType} 的第 ${slotInfo.index + 1} 個棋子被點擊`);
+     *     // 發送給 Server: { playerId: slotInfo.playerType, pieceIndex: slotInfo.index }
+     * }
+     * ```
+     */
+    public getSlotInfo(slotId: number): { playerType: number, index: number } | null {
+        return this._factoryManager.getViewTransformer()?.getSlotInfo(slotId) ?? null;
+    }
+
+    /**
+     * 將 Slot ID 轉換為玩家類型和陣列索引（元組格式）
+     * 
+     * @param slotId 坑位 ID（負數，如 -1, -2, ..., -16）
+     * @returns [玩家類型, 陣列索引]，如果 slotId 無效則返回 null
+     * 
+     * 注意：此方法返回元組 [playerType, index]，如果需要對象格式請使用 getSlotInfo()
+     * 
+     * 範例：
+     * ```typescript
+     * const result = ludoGameManager.slotIdToIndex(-6);
+     * // 返回 [1, 1] - [playerType, index]
+     * 
+     * if (result) {
+     *     const [playerType, index] = result;
+     *     console.log(`玩家 ${playerType} 的第 ${index + 1} 個棋子`);
+     * }
+     * ```
+     */
+    public slotIdToIndex(slotId: number): [number, number] | null {
+        return this._factoryManager.getViewTransformer()?.slotIdToIndex(slotId) ?? null;
+    }
+
+    /**
+     * 根據玩家類型和陣列索引生成 Slot ID
+     * 
+     * @param playerType 玩家類型 (0:Blue, 1:Red, 2:Green, 3:Yellow)
+     * @param arrayIndex 陣列索引 (0~3)
+     * @returns Slot ID（負數）
+     * 
+     * 範例：
+     * ```typescript
+     * // Server 返回數據: { playerId: 1, pieceIndex: 1 }
+     * const slotId = ludoGameManager.indexToSlotId(1, 1);
+     * // 返回 -6
+     * 
+     * // 用於初始化：為每個玩家的棋子生成 Slot ID
+     * for (let playerType = 0; playerType < 4; playerType++) {
+     *     for (let index = 0; index < 4; index++) {
+     *         const slotId = ludoGameManager.indexToSlotId(playerType, index);
+     *         console.log(`玩家 ${playerType} 的第 ${index + 1} 個棋子 Slot ID: ${slotId}`);
+     *     }
+     * }
+     * 
+     * // Server 通信場景
+     * function onServerPieceMove(data: { playerId: number, pieceIndex: number, steps: number }) {
+     *     const slotId = ludoGameManager.indexToSlotId(data.playerId, data.pieceIndex);
+     *     const pieceNode = findPieceBySlotId(slotId);
+     *     movePiece(pieceNode, data.steps);
+     * }
+     * ```
+     */
+    public indexToSlotId(playerType: number, arrayIndex: number): number {
+        const transformer = this._factoryManager.getViewTransformer();
+        if (!transformer) {
+            console.error('[LudoGameManager] ViewTransformer 未初始化');
+            return 0;
+        }
+        return transformer.indexToSlotId(playerType, arrayIndex);
     }
     
     // ========== 通用 API ==========

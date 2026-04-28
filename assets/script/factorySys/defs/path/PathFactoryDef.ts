@@ -41,6 +41,26 @@ export interface IPathGenerator {
      * @returns 該玩家的基地棋子座標陣列
      */
     getPlayerBaseSlots(playerType: number): number[][];
+    
+    /**
+     * 獲取所有玩家的 Slot ID 映射
+     * @returns 玩家類型 -> Slot ID 陣列的映射
+     */
+    getSlotIdMap(): Record<number, number[]>;
+    
+    /**
+     * 獲取指定玩家的所有 Slot ID
+     * @param playerType 玩家類型 (0:藍, 1:紅, 2:綠, 3:黃)
+     * @returns 該玩家的 Slot ID 陣列
+     */
+    getPlayerSlotIds(playerType: number): number[];
+    
+    /**
+     * 根據 Slot ID 反查玩家類型和陣列索引
+     * @param slotId 坑位 ID（負數）
+     * @returns { playerType, index } 或 null
+     */
+    getSlotInfo(slotId: number): { playerType: number, index: number } | null;
 }
 
 /**
@@ -175,6 +195,26 @@ export interface IViewTransformer {
      * @param slotsPerPlayer 每個玩家的坑位數量（預設 4）
      */
     setBaseSlotConfig(offset: number, slotsPerPlayer: number): void;
+    
+    /**
+     * 設置 Slot ID 映射表
+     * @param slotIdMap 所有玩家的 Slot ID 映射
+     */
+    setSlotIdMap(slotIdMap: Record<number, number[]>): void;
+    
+    /**
+     * 獲取指定玩家的所有 Slot ID
+     * @param playerType 玩家類型 (0:藍, 1:紅, 2:綠, 3:黃)
+     * @returns 該玩家的 Slot ID 陣列或 null
+     */
+    getPlayerSlotIds(playerType: number): number[] | null;
+    
+    /**
+     * 根據 Slot ID 反查玩家類型和陣列索引
+     * @param slotId 坑位 ID（負數）
+     * @returns { playerType, index } 或 null
+     */
+    getSlotInfo(slotId: number): { playerType: number, index: number } | null;
     
     // === 基地坑位 Slot ID 轉換方法 ===
     

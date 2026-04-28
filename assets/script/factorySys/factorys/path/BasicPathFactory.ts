@@ -74,6 +74,7 @@ export class BasicPathFactory extends PathFactory {
         if (this._currentGenerator) {
             this._currentTransformer.setPathContent(this._currentGenerator.getPathMap());
             this._currentTransformer.setBaseContent(this._currentGenerator.getBaseMap());
+            this._currentTransformer.setSlotIdMap(this._currentGenerator.getSlotIdMap());  // 🆕 傳遞 SlotID 映射
             
             // 設置基地坑位配置
             if (this._currentConfig) {
@@ -82,7 +83,7 @@ export class BasicPathFactory extends PathFactory {
                 this._currentTransformer.setBaseSlotConfig(offset, slotsPerPlayer);
             }
             
-            console.log('視角轉換器已關聯路徑和基地數據');
+            console.log('視角轉換器已關聯路徑、基地和 SlotID 數據');
         } else {
             console.warn('路徑生成器尚未創建，視角轉換器可能無法正常工作');
         }
