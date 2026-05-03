@@ -1,6 +1,7 @@
 import { SpriteFrame } from "cc";
 import { PlayerPanel } from "../PlayerPanel";
 import { PlayerColor } from "../ColorSelector";
+import { IPawn} from "./PawnDef";
 
 /**
  * 玩家靜態身分
@@ -14,9 +15,12 @@ export interface IPlayerIdentity {
     /** 玩家頭像圖片 */
     avatarSpriteFrame: SpriteFrame | null;
     /** 原始座位編號 (Server 分配) */
-    seatIndex: number;
+    seatIndex?: number;
+
+    localViewIndex?: number; // 本地視角座位編號 (0~3)，根據玩家數量和座位分配計算得出
     /** 棋盤顏色（客戶端隨機分配：0=Blue, 1=Red, 2=Green, 3=Yellow） */
     playerColor?: PlayerColor;
+    isPlayerOwner?: boolean; // 是否為玩家本人
 }
 
 /**
@@ -40,6 +44,8 @@ export interface IPlayerStatus {
     tipText: string;
 }
 
+
+
 /**
  * 整合玩家對象
  * 包含玩家的完整資訊和對應的 UI 面板引用
@@ -55,6 +61,7 @@ export interface IPlayerEntity {
     panel: PlayerPanel; 
     
     // 4. 棋子實體 (之後邏輯會用到)
+    pawns:Map<number,IPawn>;
     //pawns: Pawn[]; 
 }
 

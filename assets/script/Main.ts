@@ -61,6 +61,7 @@ export class Main extends Component {
     private async testInit(): Promise<void> {
         // 這裡可以根據需要設置遊戲模式，並調用相應的 BoardGenerator 來生成棋盤
         const gameMode= LudoGameMode.CLASSIC; // 假設有一個經典模式
+        const playerMaxCount = 4; // 假設最多4個玩家
         //await this._ludoGameManager.setBoard(gameMode);
         //await this._ludoGameManager.initGameMode(gameMode);
         await this._ludoGameManager.initGame(gameMode);

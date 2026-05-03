@@ -778,4 +778,230 @@ export class GameMapCenter {
         
         console.log(`[GameMapCenter] 地圖已清空`);
     }
+    
+    // ========== 玩家視角查詢方法（便捷API）==========
+    
+    /**
+     * 用玩家視角座標查詢格子數據
+     * 自動將玩家視角座標轉換為基本盤座標
+     * 
+     * @param r 玩家視角下的行索引
+     * @param c 玩家視角下的列索引
+     * @param playerType 當前玩家類型 (0:Blue, 1:Red, 2:Green, 3:Yellow)
+     * @param viewTransformer 視角轉換器
+     * @returns 格子數據，如果越界則返回 null
+     * 
+     * 使用範例：
+     * ```typescript
+     * // 查詢當前玩家視角下 [5, 5] 位置的格子
+     * const grid = mapCenter.getGridAtPlayerView(5, 5, currentPlayerType, viewTransformer);
+     * if (grid) {
+     *     console.log('格子狀態:', grid.state);
+     *     console.log('格子上的棋子數量:', grid.pawnsOnGrid.length);
+     * }
+     * ```
+     */
+    public getGridAtPlayerView(
+        r: number, 
+        c: number, 
+        playerType: number, 
+        viewTransformer: IViewTransformer
+    ): IGridData | null {
+        const [dataR, dataC] = viewTransformer.playerViewToBase(r, c, playerType);
+        return this.getGridAt(dataR, dataC);
+    }
+    
+    /**
+     * 用玩家視角座標設置格子狀態
+     * 
+     * @param r 玩家視角下的行索引
+     * @param c 玩家視角下的列索引
+     * @param state 格子狀態
+     * @param playerType 當前玩家類型
+     * @param viewTransformer 視角轉換器
+     */
+    public setGridStateInPlayerView(
+        r: number, 
+        c: number, 
+        state: GridState, 
+        playerType: number, 
+        viewTransformer: IViewTransformer
+    ): void {
+        const [dataR, dataC] = viewTransformer.playerViewToBase(r, c, playerType);
+        this.setGridState(dataR, dataC, state);
+    }
+    
+    /**
+     * 用玩家視角座標查詢格子狀態
+     * 
+     * @param r 玩家視角下的行索引
+     * @param c 玩家視角下的列索引
+     * @param playerType 當前玩家類型
+     * @param viewTransformer 視角轉換器
+     * @returns 格子狀態
+     */
+    public getGridStateInPlayerView(
+        r: number, 
+        c: number, 
+        playerType: number, 
+        viewTransformer: IViewTransformer
+    ): GridState | null {
+        const [dataR, dataC] = viewTransformer.playerViewToBase(r, c, playerType);
+        return this.getGridState(dataR, dataC);
+    }
+    
+    /**
+     * 用玩家視角座標檢查格子是否為空
+     * 
+     * @param r 玩家視角下的行索引
+     * @param c 玩家視角下的列索引
+     * @param playerType 當前玩家類型
+     * @param viewTransformer 視角轉換器
+     * @returns 是否為空
+     */
+    public isGridEmptyInPlayerView(
+        r: number, 
+        c: number, 
+        playerType: number, 
+        viewTransformer: IViewTransformer
+    ): boolean {
+        const [dataR, dataC] = viewTransformer.playerViewToBase(r, c, playerType);
+        return this.isGridEmpty(dataR, dataC);
+    }
+    
+    /**
+     * 用玩家視角座標檢查格子是否被占據
+     * 
+     * @param r 玩家視角下的行索引
+     * @param c 玩家視角下的列索引
+     * @param playerType 當前玩家類型
+     * @param viewTransformer 視角轉換器
+     * @returns 是否被占據
+     */
+    public isGridOccupiedInPlayerView(
+        r: number, 
+        c: number, 
+        playerType: number, 
+        viewTransformer: IViewTransformer
+    ): boolean {
+        const [dataR, dataC] = viewTransformer.playerViewToBase(r, c, playerType);
+        return this.isGridOccupied(dataR, dataC);
+    }
+    
+    /**
+     * 用玩家視角座標獲取格子上的棋子
+     * 
+     * @param r 玩家視角下的行索引
+     * @param c 玩家視角下的列索引
+     * @param playerType 當前玩家類型
+     * @param viewTransformer 視角轉換器
+     * @returns 棋子陣列
+     */
+    public getPawnsAtPlayerView(
+        r: number, 
+        c: number, 
+        playerType: number, 
+        viewTransformer: IViewTransformer
+    ): any[] {
+        const [dataR, dataC] = viewTransformer.playerViewToBase(r, c, playerType);
+        return this.getPawnsAt(dataR, dataC);
+    }
+    
+    /**
+     * 用玩家視角座標獲取格子的標記
+     * 
+     * @param r 玩家視角下的行索引
+     * @param c 玩家視角下的列索引
+     * @param playerType 當前玩家類型
+     * @param viewTransformer 視角轉換器
+     * @returns 標記陣列
+     */
+    public getMarkersInPlayerView(
+        r: number, 
+        c: number, 
+        playerType: number, 
+        viewTransformer: IViewTransformer
+    ): IMarker[] {
+        const [dataR, dataC] = viewTransformer.playerViewToBase(r, c, playerType);
+        return this.getMarkers(dataR, dataC);
+    }
+    
+    /**
+     * 用玩家視角座標檢查是否有特定標記
+     * 
+     * @param r 玩家視角下的行索引
+     * @param c 玩家視角下的列索引
+     * @param markerType 標記類型
+     * @param playerType 當前玩家類型
+     * @param viewTransformer 視角轉換器
+     * @returns 是否有該標記
+     */
+    public hasMarkerInPlayerView(
+        r: number, 
+        c: number, 
+        markerType: MarkerType, 
+        playerType: number, 
+        viewTransformer: IViewTransformer
+    ): boolean {
+        const [dataR, dataC] = viewTransformer.playerViewToBase(r, c, playerType);
+        return this.hasMarker(dataR, dataC, markerType);
+    }
+    
+    /**
+     * 用玩家視角座標添加標記
+     * 
+     * @param r 玩家視角下的行索引
+     * @param c 玩家視角下的列索引
+     * @param marker 標記對象
+     * @param playerType 當前玩家類型
+     * @param viewTransformer 視角轉換器
+     */
+    public addMarkerInPlayerView(
+        r: number, 
+        c: number, 
+        marker: IMarker, 
+        playerType: number, 
+        viewTransformer: IViewTransformer
+    ): void {
+        const [dataR, dataC] = viewTransformer.playerViewToBase(r, c, playerType);
+        this.addMarker(dataR, dataC, marker);
+    }
+    
+    /**
+     * 用玩家視角座標獲取格子的世界坐標
+     * 
+     * @param r 玩家視角下的行索引
+     * @param c 玩家視角下的列索引
+     * @param playerType 當前玩家類型
+     * @param viewTransformer 視角轉換器
+     * @returns 世界坐標
+     */
+    public getPositionAtPlayerView(
+        r: number, 
+        c: number, 
+        playerType: number, 
+        viewTransformer: IViewTransformer
+    ): Vec3 | null {
+        const [dataR, dataC] = viewTransformer.playerViewToBase(r, c, playerType);
+        return this.getPositionAt(dataR, dataC);
+    }
+    
+    /**
+     * 用玩家視角座標獲取格子節點
+     * 
+     * @param r 玩家視角下的行索引
+     * @param c 玩家視角下的列索引
+     * @param playerType 當前玩家類型
+     * @param viewTransformer 視角轉換器
+     * @returns 格子節點
+     */
+    public getNodeAtPlayerView(
+        r: number, 
+        c: number, 
+        playerType: number, 
+        viewTransformer: IViewTransformer
+    ): Node | null {
+        const [dataR, dataC] = viewTransformer.playerViewToBase(r, c, playerType);
+        return this.getNodeAt(dataR, dataC);
+    }
 }

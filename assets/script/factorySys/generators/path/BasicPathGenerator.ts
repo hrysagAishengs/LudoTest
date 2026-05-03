@@ -48,8 +48,9 @@ const BLUE_BASE_SLOTS = [
 export class BasicPathGenerator implements IPathGenerator {
     
     private _pathMap: Record<number, number[][]> = {};
+    //private _pathMapOld: Record<number, number[][]> = {};
     private _baseMap: Record<number, number[][]> = {};
-    private _slotIdMap: Record<number, number[]> = {};  // 🆕 存儲每個玩家的 SlotID 陣列
+    private _slotIdMap: Record<number, number[]> = {};  // 存儲每個玩家的 SlotID 陣列
     
     // 硬編碼配置（當前實現限制）
     private readonly GRID_SIZE = 15;  // 路徑座標為 15×15 棋盤設計，不可更改
@@ -117,6 +118,23 @@ export class BasicPathGenerator implements IPathGenerator {
         }
     }
 
+    public createPathsOld():void{
+        return;
+        // 獲取藍色基礎路徑 (包含 Outer + Inner)
+        /*
+        const basePath = [...BLUE_OUTER_PATH, ...BLUE_INNER_PATH];
+        for (let playerType = 0; playerType < this._playerCount; playerType++) {
+            // 根據玩家類型進行座標轉換
+            this._pathMapOld[playerType] = basePath.map(coord => 
+                this.rotateCoordsOld(coord[0], coord[1], playerType)
+            );
+            
+        }
+
+        console.log('路徑生成完成OLD',this._pathMapOld);
+        */
+    }
+
     public createPaths(): void {
         // 獲取藍色基礎路徑 (包含 Outer + Inner)
         const basePath = [...BLUE_OUTER_PATH, ...BLUE_INNER_PATH];
@@ -124,12 +142,14 @@ export class BasicPathGenerator implements IPathGenerator {
         for (let playerType = 0; playerType < this._playerCount; playerType++) {
             // 根據玩家類型進行座標轉換
             this._pathMap[playerType] = basePath.map(coord => 
-                this.rotateCoords(coord[0], coord[1], playerType)
+                //this.rotateCoords(coord[0], coord[1], playerType)
+                this.rotateCoordsOld(coord[0], coord[1], playerType)
             );
+            
         }
+
+        console.log('路徑生成完成',this._pathMap);
         
-        console.log(`路徑生成完成：共 ${this._playerCount} 玩家，每條路徑 ${basePath.length} 格`);
-        console.log('all paths:', this._pathMap);
     }
 
      /**
@@ -143,7 +163,7 @@ export class BasicPathGenerator implements IPathGenerator {
                 this.translateBaseCoords(coord[0], coord[1], playerType)
             );
             
-            // 🆕 同時生成 SlotID 陣列
+            //  同時生成 SlotID 陣列
             const startSlotId = this._baseSlotIdOffset - (playerType * this._slotsPerPlayer);
             this._slotIdMap[playerType] = Array.from(
                 { length: this._slotsPerPlayer }, 
@@ -164,6 +184,11 @@ export class BasicPathGenerator implements IPathGenerator {
     public getPathMap(): Record<number, number[][]> {
         return this._pathMap;
     }
+
+    /*
+    public getPathMapOld(): Record<number, number[][]> {
+        return this._pathMapOld;
+    }*/
 
     public getPlayerPath(playerType: number): number[][] {
         if (!this._pathMap[playerType]) {
@@ -223,6 +248,7 @@ export class BasicPathGenerator implements IPathGenerator {
      * - slotId = -2 → { playerType: 0, index: 1 }  (Blue 的第 2 個坑位)
      * - slotId = -6 → { playerType: 1, index: 1 }  (Red 的第 2 個坑位)
      */
+    /*
     public getSlotInfo(slotId: number): { playerType: number, index: number } | null {
         for (const playerType in this._slotIdMap) {
             const slots = this._slotIdMap[playerType];
@@ -232,7 +258,7 @@ export class BasicPathGenerator implements IPathGenerator {
             }
         }
         return null;
-    }
+    }*/
 
     /**
      * 將藍色基地坑位座標平移以適應其他玩家
@@ -266,11 +292,39 @@ export class BasicPathGenerator implements IPathGenerator {
         }
     }
 
+    private rotateCoordsOld(row: number, col: number, playerType: number): [number, number] {
+        const center = Math.floor(this.GRID_SIZE / 2); // 15x15 的中心索引是 7
+        let r = row - center;
+        let c = col - center;
+
+        // 順時針旋轉 90 度 * playerType 次---old公式
+        for (let i = 0; i < playerType; i++) {
+            // 順時針旋轉 90 度公式: (r, c) -> (-c, r)
+            let temp = r;
+            r = -c;
+            c = temp;
+           
+        }
+       
+
+        return [r + center, c + center];
+    }
+
     /**
      * 將藍色路徑座標旋轉以適應其他玩家
+     * 
+     * ⚠️ 重要：此方法必須保持 playerType 與旋轉次數的直接對應關係
+     * 整個系統（路徑生成、重映射、視角轉換）都依賴這個假設
+     * 
+     * 標準旋轉映射（順時針）：
+     * - playerType 0: 0次旋轉 (0°)   → [1,6]   (底部)
+     * - playerType 1: 1次旋轉 (90°)  → [6,13]  (右側)
+     * - playerType 2: 2次旋轉 (180°) → [13,8]  (頂部)
+     * - playerType 3: 3次旋轉 (270°) → [8,1]   (左側)
+     * 
      * @param row 原始 Row
      * @param col 原始 Col
-     * @param playerType 0:藍, 1:紅, 2:綠, 3:黃
+     * @param playerType 玩家類型 (0-3)，直接對應旋轉次數
      */
     private rotateCoords(row: number, col: number, playerType: number): [number, number] {
         const center = Math.floor(this.GRID_SIZE / 2); // 15x15 的中心索引是 7
@@ -278,16 +332,13 @@ export class BasicPathGenerator implements IPathGenerator {
         let c = col - center;
 
         // 順時針旋轉 90 度 * playerType 次
+        // ⚠️ 不要在這裡使用自定義映射！這會破壞系統一致性
+      
         for (let i = 0; i < playerType; i++) {
-            // 順時針旋轉 90 度公式: (r, c) -> (-c, r)
-            let temp = r;
-            r = -c;
-            c = temp;
-            /*
+            // 順時針旋轉 90 度公式: (r, c) -> (c, -r)
             const temp = r;
             r = c;
             c = -temp;
-            */
         }
 
         return [r + center, c + center];

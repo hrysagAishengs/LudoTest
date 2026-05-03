@@ -1,5 +1,12 @@
-import { _decorator, Component, Label, Node, Sprite, SpriteFrame, Color } from 'cc';
+import { _decorator, Component, Label, Node, Sprite, SpriteFrame, Color, color } from 'cc';
 import { IPlayerIdentity, IPlayerStatus } from './def/PlayerDataDef';
+
+const COLOR_LIST=new Map<number,Color>([
+    [0,color(140, 210, 255, 255)],//藍
+    [1,color(255, 120, 130, 255)],//紅
+    [2,color(150, 220, 160, 255)],//綠
+    [3,color(255, 245, 160, 255)]//黃
+]);
 const { ccclass, property } = _decorator;
 
 /**
@@ -38,6 +45,18 @@ export class PlayerPanel extends Component {
 
     @property({type:Node,tooltip:'托管圖標',visible:true,displayName:'托管圖標'})
     private _autoModeIcon: Node = null;
+
+    @property({type:Label,tooltip:'DevTable',visible:true,displayName:'Dev桌號'})
+    private _devTableLabel: Label = null;
+
+    @property({type:Label,tooltip:'DevDiceResult',visible:true,displayName:'Dev骰子結果'})
+    private _devDiceResultLabel: Label = null;
+
+    @property({type:Label,tooltip:'DevInfo',visible:true,displayName:'Dev資訊'})
+    private _devInfoLabel: Label = null;
+
+    @property({type:Node,tooltip:'bg',visible:true,displayName:'背景'})
+    private _bgNode: Node = null;
 
     /** 骰子點數對應的圖集 */
     private _diceSpriteFrames: SpriteFrame[] = [];
@@ -81,6 +100,7 @@ export class PlayerPanel extends Component {
         this.showTurn(status.isCurrentTurn);
         this.setAutoMode(status.isAuto);
         this.showTip(status.tipText);
+        this.setPlayerColor(identity.playerColor ?? 0);
         
         if (status.diceResult > 0) {
             this.showDiceResult(status.diceResult);
@@ -103,6 +123,16 @@ export class PlayerPanel extends Component {
     }
 
     // ==================== 新增方法 ====================
+    public setPlayerColor(colorIndex: number): void {
+        
+        const colorValue = COLOR_LIST.get(colorIndex);
+        if (this._bgNode && colorValue) {
+            const sprite = this._bgNode.getComponent(Sprite);
+            if (sprite) {
+                sprite.color = colorValue;
+            }
+        }
+    }
 
     /**
      * 更新金錢顯示

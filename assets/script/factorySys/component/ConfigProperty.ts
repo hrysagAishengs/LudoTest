@@ -33,6 +33,15 @@ export enum TableTypeTag {
 }
 Enum(TableTypeTag);
 
+export enum MarkerDirection {
+    NONE = 0,           // 無方向
+    UP = 1,              // 向上
+    RIGHT = 2,           // 向右
+    DOWN = 3,            // 向下
+    LEFT = 4             // 向左
+}
+Enum(MarkerDirection);
+
 /**
  * 棋盤配置組
  * 包含棋盤相關的所有配置參數（資源 + 邏輯）
@@ -119,6 +128,26 @@ export class BoardConfigGroup {
     }
 }
 
+@ccclass('MapDecorationItem')
+export class MapDecorationItem {
+    
+    @property({
+        type: Enum(MarkerDirection),
+        displayName: '符號圖示方向',
+        tooltip: '符號圖示的方向',
+    })
+    direction: MarkerDirection = MarkerDirection.NONE;
+    
+    @property({ 
+        tooltip: '裝飾棋盤符號格子座標'
+    })
+    position: Vec2 = new Vec2(0,0);
+
+    constructor(pos: Vec2 = new Vec2(0,0), dir: MarkerDirection = MarkerDirection.NONE) {
+        this.position = pos;
+        this.direction = dir;
+    }
+}
 /**
  * 地圖裝飾配置組
  * 定義地圖上需要裝飾的格子位置和類型
@@ -152,10 +181,9 @@ export class MapDecorationConfigGroup {
     ];
 
     // ========== 箭頭裝飾 ==========
-    // 修正：如果你想在面板手動輸入座標，建議繼續使用 Vec2 陣列
     // 如果硬要用 number[]，面板只會顯示一長串數字，不直觀。
     @property({
-        type: [Vec2],
+        type: [MapDecorationItem],
         displayName: '箭頭裝飾位置',
         tooltip: '箭頭裝飾的格子座標 (x=row, y=col)',
         // 當模式為 ARROW 時才顯示
@@ -163,7 +191,7 @@ export class MapDecorationConfigGroup {
             return this.mapMarkerMode === MarkerType.ARROW; 
         }
     })
-    public arrowPositions: Vec2[] = [];
+    public arrowPositions: MapDecorationItem[] = [new MapDecorationItem()];
 
    
 
@@ -232,7 +260,7 @@ export class MapDecorationConfigGroup {
     })
     public safeSize:number = 0;
 
-     @property({
+    @property({
         type: SpriteFrame,
         displayName: '箭頭符號圖示',
         tooltip: '要顯示的箭頭符號圖片',
@@ -250,6 +278,9 @@ export class MapDecorationConfigGroup {
         }
     })
     public arrowSize:number = 0;
+
+    
+    
 
     /**
      * 只提取當前模式相關的資料
@@ -354,12 +385,28 @@ export class RoomConfigGroup {
     public panelContainer: Node | null = null;
 }
 
+
+
 /**
  * 路徑配置組
  * 包含路徑生成相關的配置參數
  */
 @ccclass('PathConfigGroup')
 export class PathConfigGroup {
+    
+    @property({ 
+        type: CCBoolean, // 強制指定型別為 Boolean
+        tooltip: '產生測試路徑編號'
+    })
+    useTestPathIndex: boolean = false; // 修正拼字並初始化
+
+
+    @property({ 
+        type: Prefab,
+        tooltip: '測試路徑容器',
+        visible: function() { return this.useTestPathIndex; }
+    })
+    debugPrefab?: Prefab = null;
     
     @property({ 
         tooltip: '玩家數量（預設 4）'
@@ -397,7 +444,8 @@ export class PathConfigGroup {
             outerPathLength: this.outerPathLength,
             innerPathLength: this.innerPathLength,
             baseSlotIdOffset: this.baseSlotIdOffset,
-            slotsPerPlayer: this.slotsPerPlayer
+            slotsPerPlayer: this.slotsPerPlayer,
+            useTestPathIndex: this.useTestPathIndex
         };
     }
 }

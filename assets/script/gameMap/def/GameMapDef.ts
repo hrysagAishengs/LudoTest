@@ -24,6 +24,7 @@ export enum MarkerType {
     SPECIAL = 5          // 特殊標記
 }
 
+
 /**
  * 裝飾圖示類型枚舉
  */

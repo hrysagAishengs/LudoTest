@@ -80,6 +80,16 @@ export class BasicBoardGenerator implements IBoardGenerator{
         return this._cellPositions[r]?.[c] || new Vec3(0, 0, 0);
     }
 
+    public getCellWorldPosition(r: number, c: number): Vec3 {
+        
+        const localPos = this.getCellPosition(r, c);
+        const transform = this.nodeContainer?.getComponent(UITransform);
+        if (!transform) {
+            return localPos;
+        }
+        return transform.convertToWorldSpaceAR(localPos);
+    }
+
     /**
      * 獲取玩家基地坑位的位置座標(放置旗子的地方)
      * 獲取基地坑位的座標
@@ -92,6 +102,22 @@ export class BasicBoardGenerator implements IBoardGenerator{
         // 向右偏移半格，向上偏移半格，即為四格交會的中心點
         const halfCell = this._cellSize / 2; // (因為預設基礎單位是 48)
         return new Vec3(basePos.x + halfCell, basePos.y + halfCell, basePos.z);
+    }
+
+    /**
+     * 獲取玩家基地坑位的位置座標(放置旗子的地方)
+     * @param r 較小的 row 索引 (例如 1)
+     * @param c 較小的 col 索引 (例如 1)
+     * @returns 世界座標
+     */
+    public getBaseSlotWorldPosition(r: number, c: number): Vec3 {
+        
+        const localPos = this.getBaseSlotPosition(r, c);
+        const transform = this.nodeContainer?.getComponent(UITransform);
+        if (!transform) {
+            return localPos;
+        }
+        return transform.convertToWorldSpaceAR(localPos);
     }
 
     public getAllBaseSlotPositions(): Vec3[][] {

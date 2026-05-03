@@ -1,6 +1,10 @@
-import { _decorator, color, Component, Graphics, Node, UITransform, Vec3 } from 'cc';
+import { _decorator, Color, color, Component, Graphics, instantiate, Node, Prefab, UITransform, Vec3 } from 'cc';
 import { LudoGameMode } from './gameDef/GameDef';
 import { GameFactoryManager } from './gameMode/GameFactoryManager';
+import { IPlayerIdentity } from './gamePlayer/def/PlayerDataDef';
+import { AniSysManager } from './aniPresentSys/AniSysManager';
+import { IPawnInfo } from './gamePlayer/def/PawnDef';
+import { Pawn } from './gamePlayer/Pawn';
 const { ccclass, property } = _decorator;
 
 /**
@@ -37,7 +41,11 @@ export class LudoGameManager extends Component {
     @property({type:GameFactoryManager,displayName:"遊戲工廠管理器",tooltip:"負責管理遊戲工廠和組件的管理器",visible:true})
     private _factoryManager: GameFactoryManager = null;
     
-
+    @property({type:Prefab,displayName:"測試用pawn",tooltip:"用於測試的Pawn組件",visible:true})
+    private _testPawn: Prefab = null;
+    
+    @property({type:AniSysManager,displayName:"動畫系統管理器",tooltip:"負責管理動畫系統的組件",visible:true})
+    private _aniSysManager: AniSysManager = null!;
     /*
     @property({type:BoardGeneratorManager,displayName:"棋盤生成管理器",tooltip:"負責管理棋盤生成的組件",visible:true})
     private _boardGeneratorManager: BoardGeneratorManager = null!;
@@ -62,6 +70,31 @@ export class LudoGameManager extends Component {
     public setupRoom(playerCount: number): void {
         this._factoryManager.setupRoom(playerCount);
         console.log(`[LudoGameManager] 房間設置完成：${playerCount} 人局`);
+    }
+    
+    /**
+     * 測試方法：設置房間並指定顏色排列索引
+     * 用於重現特定的基本盤狀態來調試問題
+     * 
+     * @param playerCount - 玩家數量 (2/3/4)
+     * @param colorCombinationIndex - 顏色排列索引 (0=0°, 1=90°, 2=180°, 3=270°)
+     * 
+     * 顏色排列對應：
+     * - 0: [Blue, Red, Green, Yellow]   (0° 旋轉)
+     * - 1: [Yellow, Blue, Red, Green]   (90° 旋轉)
+     * - 2: [Green, Yellow, Blue, Red]   (180° 旋轉)
+     * - 3: [Red, Green, Yellow, Blue]   (270° 旋轉)
+     * 
+     * 使用範例：
+     * ```typescript
+     * // 重現 180° 旋轉的基本盤狀態
+     * ludoGameManager.setupRoomWithColorIndex(4, 2);
+     * // 結果：座位0=Green, 座位1=Yellow, 座位2=Blue, 座位3=Red
+     * ```
+     */
+    public setupRoomWithColorIndex(playerCount: number, colorCombinationIndex: number): void {
+        this._factoryManager.setupRoomWithColorIndex(playerCount, colorCombinationIndex);
+        console.log(`[LudoGameManager] 【測試模式】房間設置完成：${playerCount} 人局，顏色索引=${colorCombinationIndex}`);
     }
     
     /**
@@ -102,82 +135,170 @@ export class LudoGameManager extends Component {
 
     public testPathMode(): void {
         
-        const playerType = 2// 0: Blue, 1: Red, 2: Green, 3: Yellow
+       
+        
+       
+        // ========== 原有测试代码（已注释） ==========
+        //this._comprehensiveAPIValidation();
+        this._testRotation();
+    }
+
+   
+
+   
+
+
+    private testDraw(pos:Vec3, color?:Color):void{
+        if (!color) {
+            color = new Color(0, 0, 0, 255);
+        }
+        let testNode:Node=new Node();
+        let uitransform=testNode.addComponent(UITransform);
+        uitransform.setContentSize(48,48);
+        let graphic:Graphics=testNode.addComponent(Graphics);
+        graphic.fillColor=color;
+        graphic.rect(-24,-24,48,48);
+        graphic.fill();
+        this._testNode.addChild(testNode);
+        testNode.setPosition(pos);
+    }
+
+    private async _testRotation(): Promise<void> {
+        // ========== 先測試 getPlayerDestinationByIndex API ==========
+        //this._testGetPlayerDestinationByIndexAPI();
+        
+        // ========== 然後繼續原有測試 ==========
+        //this._factoryManager.testRotate(1);
         const roomMaxPlayerCount = 4;
-        this.setupRoom(roomMaxPlayerCount);
-        this.rotateBoardView(playerType);
-        const playerDestination = this.getPlayerDestinationByPos(playerType, [1, 6], 9);
-        console.log(`Player ${playerType} destination after moving 5 steps from [1, 6]:`, playerDestination);
         
-        const playerDes=this.getPlayerDestinationByIndex(playerType, 0, 9);
-        console.log(`Player ${playerType} AAAA after moving 5 steps from index 0:`, playerDes);
-        
-        //const playerPathSegment = this.getPlayerPathSegment(playerType, [1, 6], 9);
-        //const playerPathSegment=this.getPlayerPathSegmentByIndex(playerType, 0, 9);
-        const otherPlayerDestination = this.getOtherPlayerDestToGlobal(playerType, 1, 0, 9);
-        const otherPlayerSegment = this.getOtherPlayerDestToGlobalSegment(playerType, 1, 0, 9);
-
-        console.log('testSegment',otherPlayerSegment);
-        //const drawPos=this.getCellPosition(otherPlayerDestination[0],otherPlayerDestination[1]);
-        
-        
-        //console.log(`Player ${playerType} path segment from [1, 6] moving 5 steps:`, playerPathSegment);
-        //const pos=this.getCellPosition(playerDes[0],playerDes[1]);
-        //const test = this.getPlayerDestinationByPos(playerType, [1, 6], 55);
-        //const pos=this.getCellPosition(test[0],test[1]);
-        //this.testDraw(pos);
-
-        const slotPos=this.getPlayerBSToGlobalByCurrentView(1, -8, playerType);
-        const drawPos=this.getBaseSlotPosition(slotPos[0],slotPos[1]);
-        //const slotPos=this.getPlayerBSToGlobalByCurrentView(0, -1, playerType);
-        //const slotPos=this.getPlayerBSToGlobalByCurrentView(0, -1, playerType);    
-        //const slotPos=this.getOtherPlayerBSByIdToGlobal(-1, playerType);
-        //const drawPos=this.getBaseSlotPosition(slotPos[0],slotPos[1]);
-
-        
-        this.testDraw(drawPos);
-        
-        // ========== 測試：Slot ID 查詢功能 ==========
-        console.log('=== 測試 Slot ID 查詢功能 ===');
-        
-        // 測試 1：獲取每個玩家的 Slot ID 陣列
-        console.log('各玩家的 Slot ID:');
-        for (let i = 0; i < 4; i++) {
-            const slotIds = this.getPlayerSlotIds(i);
-            const playerNames = ['Blue', 'Red', 'Green', 'Yellow'];
-            console.log(`  ${playerNames[i]} (${i}):`, slotIds);
+        this.setupRoomWithColorIndex(roomMaxPlayerCount, 3);
+     
+        // 【調試】輸出座位和顏色的匹配結果
+        const roomManager = this.getRoomPlayerManager();
+        const colorNames = ['Blue', 'Red', 'Green', 'Yellow'];
+        if (roomManager) {
+            console.log('=== 座位颜色匹配 ===');
+            for (let i = 0; i < roomMaxPlayerCount; i++) {
+                const color = roomManager.getSeatColor(i);
+                console.log(`  座位${i} = ${colorNames[color]}(${color})`);
+            }
         }
         
-        // 測試 2：反查 Slot ID 的信息
-        console.log('\nSlot ID 反查測試:');
-        const testSlotIds = [-1, -2, -5, -6, -10, -13, -16];
-        testSlotIds.forEach(slotId => {
-            const info = this.getSlotInfo(slotId);
-            if (info) {
-                const playerNames = ['Blue', 'Red', 'Green', 'Yellow'];
-                console.log(`  SlotID ${slotId} -> ${playerNames[info.playerType]} (playerType=${info.playerType}, index=${info.index})`);
-            }
-        });
+        const playerType = 2;
         
-        // 測試 3：模擬實際使用場景
-        console.log('\n模擬點擊棋子場景:');
-        const clickedSlotId = -6;  // 假設玩家點擊了 Red 的第 2 個棋子
-        const clickedInfo = this.getSlotInfo(clickedSlotId);
-        if (clickedInfo) {
-            const playerNames = ['Blue', 'Red', 'Green', 'Yellow'];
-            console.log(`  玩家點擊了: ${playerNames[clickedInfo.playerType]} 的第 ${clickedInfo.index + 1} 個棋子`);
-            console.log(`  可發送給 Server: { playerId: ${clickedInfo.playerType}, pieceIndex: ${clickedInfo.index} }`);
+        
+        // 【調試】輸出該玩家的顏色
+        if (roomManager) {
+            const playerColor = roomManager.getSeatColor(playerType);
+            console.log(`本機玩家座位${playerType}的顏色: ${colorNames[playerColor]}(${playerColor})`);
+        }
+        
+        //return;
+        this.setupLocalPlayerView(playerType);
+        const playerInfo:IPlayerIdentity={
+            uid: '',
+            nickname: 'testPlayer',//-玩家暱稱
+            avatarSpriteFrame:null,//-玩家頭像圖片
+        }
+        this._factoryManager.addPlayer(playerInfo,playerType);
+
+        await this.createRoomPawns();
+
+        // 測試1: 獲取玩家起點並繪製
+        //const playerDes=this.getPlayerDestinationByIndex(playerType, 0, 0);
+        const playerDes=this.getPathCoordInViewByStartIndex(playerType, 0, 10);
+        const drawPos=this.getCellPosition(playerDes[0],playerDes[1]);
+        console.log('起點座標 ownerPlayerDes:', playerDes);
+        this.testDraw(drawPos, color(0,0,0,255));
+
+        // 測試5: 測試 getOtherPlayerDestToGlobal（其他玩家的路徑）
+        console.log('\n=== 測試 getOtherPlayerDestToGlobal ===');
+        // otherPlayer=1 表示左上角的玩家（相對於當前視角）
+        const path_testOtherPlayerChairId=3;
+        const otherPlayerDes = this.getPathCoordInViewByStartIndex(path_testOtherPlayerChairId, 0, 1);
+        if (otherPlayerDes) {
+            const drawOtherPos = this.getCellPosition(otherPlayerDes[0], otherPlayerDes[1]);
+            console.log(`其他玩家(左上角)的起點座標: [${otherPlayerDes[0]}, ${otherPlayerDes[1]}]`);
+            if (drawOtherPos) {
+                this.testDraw(drawOtherPos, color(0,0,0,125));  // 黑色半透明標記
+            }
+        }
+
+        //--test--
+        const testttt=this._factoryManager.getViewTransformer().getSeatBaseSlotInView(playerType, 0);
+        
+        // 測試2: 使用新的座位感知方法獲取第1個坑位
+        const slotIndex=3;
+        const slotData = this.getPlayerBaseBySlotIndex(playerType, slotIndex);  // 座位playerType的第1個坑位
+        if (slotData) {
+            const slotPos = this.getBaseSlotPosition(slotData[0], slotData[1]);
+            const slotId=this.getPlayerSlotIdBySlotIndex(playerType, slotIndex);
+            const slotList=this.getPlayerBSIdList(playerType);
+            const allSlotList=this.getAllSlotIds();
             
-            // 進一步獲取該坑位在當前視角下的座標
-            const slotCoord = this.getPlayerBSToGlobalByCurrentView(clickedInfo.playerType, clickedSlotId, playerType);
-            if (slotCoord) {
-                console.log(`  該棋子在視角 ${playerType} 下的座標: [${slotCoord[0]}, ${slotCoord[1]}]`);
+            console.log('playerID', playerType, '坑位ID:', slotId, '對應的基本盤座標:', slotData,'坑為列表',slotList,'allSlotList',allSlotList);
+           
+            this.testDraw(slotPos, color(0,0,0,128));
+        }
+
+        //--玩家視角下其他的玩家坑位測試
+        //--bug--如果玩家視角是playerType=3,但是這個API適用於<玩家視角下的相對座位>
+        const otherPlayerIndex = 3;  // 左上角玩家(這裡是用chairId)
+        const otherSlotData = this.getPlayerBaseBySlotIndex(otherPlayerIndex, slotIndex);
+        if (otherSlotData) {
+            const otherSlotPos = this.getBaseSlotPosition(otherSlotData[0], otherSlotData[1]);
+            const otherSlotId=this.getPlayerSlotIdBySlotIndex(otherPlayerIndex, slotIndex);
+            const otherSlotList=this.getPlayerBSIdList(otherPlayerIndex);
+            console.log('otherPlayerID', otherPlayerIndex, 'otherSlotId:', otherSlotId, '對應的基本盤座標:', slotData,'坑為列表',otherSlotList);
+            this.testDraw(otherSlotPos, color(255,0,0,128));  // 紅色半透明標記
+        }
+        
+        // 測試3: 批量獲取所有坑位
+        /*
+        console.log(`\n座位${playerType}的所有坑位座標:`);
+        const allSlots = this.getSeatAllBaseSlotsInView(playerType);
+        if (allSlots) {
+            allSlots.forEach((slot, index) => {
+                console.log(`  坑位${index + 1}: [${slot[0]}, ${slot[1]}]`);
+            });
+        }
+        
+        // 測試4: 反向查詢（驗證第一個坑位）
+        if (slotData) {
+            const reverseInfo = this.getSlotInfoByCoord(slotData[0], slotData[1], playerType);
+            if (reverseInfo) {
+                const colorNames = ['Blue', 'Red', 'Green', 'Yellow'];
+                console.log(`\n反向查詢 [${slotData[0]}, ${slotData[1]}]:`);
+                console.log(`  座位: ${reverseInfo.seatIndex}`);
+                console.log(`  坑位: 第${reverseInfo.slotOffset + 1}個`);
+                console.log(`  顏色: ${colorNames[reverseInfo.playerColor]}`);
             }
         }
         
-        console.log('=== Slot ID 測試完成 ===\n');
         
-        // ========== 測試：視角坐標轉換與地圖查詢 ==========
+        
+        // 測試其他玩家移動1步
+        const otherPlayerMove1 = this.getPlayerDestinationByIndexInView(1, 0, 1);
+        if (otherPlayerMove1) {
+            console.log(`其他玩家(左上角)移動1步後的座標: [${otherPlayerMove1[0]}, ${otherPlayerMove1[1]}]`);
+        }*/
+        
+    }
+
+   
+
+    
+
+   
+
+   
+
+
+    
+
+    //---testRotationRoom-
+    private _testGridMap(): void {
+           // ========== 測試：視角坐標轉換與地圖查詢 ==========
         console.log('=== 測試視角坐標轉換與地圖查詢 ===');
         
         // 場景：玩家2點擊了視覺坐標 [10, 10]，想查詢這個格子的數據
@@ -236,31 +357,57 @@ export class LudoGameManager extends Component {
         }
         
         console.log('=== 測試完成 ===');
-        
-        //console.log(`Player ${playerType} destination position in world coordinates:`, pos);    
-        //const playerPathSegment = this._pathManager.getPlayerPathSegment(playerType, [1, 6], 5);
-        //console.log(`Player ${playerType} path segment from [1, 6] moving 5 steps:`, playerPathSegment);
-        //const otherPlayerDestination = this._pathManager.getOtherPlayerDestToGlobal(playerType, 1, 0, 5);
-        //console.log(`Player ${playerType} sees other player 1 moving 5 steps from index 0:`, otherPlayerDestination);
-        //const otherPlayerSegment = this._pathManager.getOtherPlayerDestToGlobalSegment(playerType, 1, 0, 5);
-        //console.log(`Player ${playerType} sees other player 1 path segment moving 5 steps from index 0:`, otherPlayerSegment);
     }
 
-
-    private testDraw(pos:Vec3):void{
+    // ========== AniSys API ==========
+    public async createRoomPawns(): Promise<void> {
         
-        let testNode:Node=new Node();
-        let uitransform=testNode.addComponent(UITransform);
-        uitransform.setContentSize(48,48);
-        let graphic:Graphics=testNode.addComponent(Graphics);
-        graphic.fillColor=color(0,0,0,255);
-        graphic.rect(-24,-24,48,48);
-        graphic.fill();
-        this._testNode.addChild(testNode);
-        testNode.setPosition(pos);
+        const roomManager = this.getRoomPlayerManager();
+        if (!roomManager) return;
+
+        const players = roomManager.getAllPlayers();
+        
+        for (const player of players) {
+            
+            const seatIndex = player.identity.seatIndex;
+            if (seatIndex === undefined) continue;
+
+            const baseList=this.getPlayerBaseList(seatIndex);
+            //getPlayerBSIdList
+            const slotIdList=this.getPlayerSlotIdList(seatIndex);
+            const len=baseList? baseList.length:0;
+            for(let i=0;i<len;i++){
+                
+                const wpos=this._factoryManager.getBoardGenerator()?.getBaseSlotWorldPosition(baseList[i][0], baseList[i][1]);
+                const slotId=slotIdList? slotIdList[i]:undefined;
+                const pawnInfo: IPawnInfo = {
+                    pathDataIndex: -1,
+                    pathDataCoord: null,
+                    localViewIndex: player.identity.localViewIndex,
+                    localViewCoord: [baseList[i][0], baseList[i][1]],
+                    slotId: slotId,
+                    baseSlotIndex: i,
+                    isInBase: true,
+                    isInHome: true,
+                    isMoving: false
+                };
+
+                const node = instantiate(this._testPawn);
+                const pawn = node.getComponent(Pawn);
+                pawn.init(pawnInfo, player.identity.playerColor, i);
+                roomManager.addPawn(player.identity.seatIndex, i, pawn);
+                await this._aniSysManager.showPawn(pawn, wpos);
+            }
+        }
+    }    
+    /**
+     * 獲取動畫系統管理器
+     * @returns 動畫系統管理器，如果未初始化則返回 null
+     */
+    public getAniSysManager(): AniSysManager | null {
+        return this._aniSysManager;
     }
-
-
+    
     //----move player----
     public movePlayerByPos(playerType: number, startPos: [number, number], steps: number): void {
 
@@ -335,290 +482,172 @@ export class LudoGameManager extends Component {
         return this._factoryManager.getPathGenerator()?.getPlayerPath(playerType) ?? null;
     }
     
-    /**
-     * <移動>
-     */
-    public getPlayerDestinationByPos(
-        playerView: number,
-        startPos: [number, number],
-        steps: number
-    ): [number, number] | null {
-        return this._factoryManager.getViewTransformer()?.getDestinationByPos(
-            playerView,
-            startPos,
-            steps
-        ) ?? null;
-    }
+    
     
     /**
-     * <移動>
+     * 依照真實座位與路徑 index 取得目前畫面上的目的座標。
+     *
+     * @param chairId 真實座位 / 玩家 index。
+     * @param startIndex 棋子目前所在的路徑 index。
+     * @param steps 要前進的步數。
+     * @returns 目前玩家視角下的棋盤座標 [row, col]，若路徑不存在或超出範圍則回傳 null。
      */
-    public getPlayerDestinationByIndex(
-        playerView: number,
+    public getPathCoordInViewByStartIndex(
+        chairId: number,
         startIndex: number,
         steps: number
     ): [number, number] | null {
-        return this._factoryManager.getViewTransformer()?.getDestinationByStartIndex(
-            playerView,
-            startIndex,
-            steps
-        ) ?? null;
-    }
-    
-    /**
-     * <移動>
-     * 獲取從起點到終點的完整路徑段（基於起點位置）
-     * 
-     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @param startPos 起點位置 [row, col]（玩家視角下的座標）
-     * @param steps 移動步數
-     * @returns 路徑段陣列（包含起點和終點，均為玩家視角下的座標），如果超出路徑返回 null
-     */
-    public getPlayerPathSegment(
-        playerView: number,
-        startPos: [number, number],
-        steps: number
-    ): number[][] | null {
-        return this._factoryManager.getViewTransformer()?.getPathSegmentByPos(
-            playerView,
-            startPos,
-            steps
-        ) ?? null;
-    }
-
-    /**
-     * <移動>
-     * 獲取從起點到終點的完整路徑段（基於起點索引）
-     * 
-     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @param startIndex 起點索引（在該玩家路徑陣列中的索引位置）
-     * @param steps 移動步數
-     * @returns 路徑段陣列（包含起點和終點，均為玩家視角下的座標），如果超出路徑返回 null
-     */
-    public getPlayerPathSegmentByIndex(
-        playerView: number,
-        startIndex: number,
-        steps: number
-    ): number[][] | null {
-        return this._factoryManager.getViewTransformer()?.getPathSegmentByStartIndex(
-            playerView,
+        return this._factoryManager.getViewTransformer()?.getPathCoordInViewByStartIndex(
+            chairId,
             startIndex,
             steps
         ) ?? null;
     }
 
     /**
-     * <移動>
-     * 計算其他玩家從指定索引移動後的路徑段（返回當前玩家視角下的座標）
-     * 
-     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @param otherPlayer 在當前玩家視角下的其他玩家相對位置 (0:左下, 1:左上, 2:右上, 3:右下)
-     * @param startIndex 其他玩家在**基本盤路徑**上的起點索引
-     * @param steps 移動步數
-     * @returns 路徑段陣列（包含起點和終點，均為當前玩家視角下的座標），如果超出路徑返回 null
+     * 依照真實座位與路徑 index 取得目前畫面上的移動路徑片段。
+     *
+     * @param chairId 真實座位 / 玩家 index。
+     * @param startIndex 棋子目前所在的路徑 index。
+     * @param steps 要前進的步數。
+     * @returns 目前玩家視角下的路徑座標陣列，包含起點與終點；若路徑不存在或超出範圍則回傳 null。
      */
-    public getOtherPlayerDestToGlobal(
-        playerView: number,
-        otherPlayer: number,
-        startIndex: number,
-        steps: number
-    ): [number, number] | null {
-        return this._factoryManager.getViewTransformer()?.getOtherPlayerDestToGlobal( 
-            playerView,
-            otherPlayer,
+    public getPathSegmentInViewByStartIndex(chairId: number, startIndex: number, steps: number): number[][] | null {
+        return this._factoryManager.getViewTransformer()?.getPathSegmentInViewByStartIndex(
+            chairId,
             startIndex,
             steps
         ) ?? null;
     }
 
     /**
-     * <移動>
-     * 計算其他玩家從指定索引移動後的路徑段（返回當前玩家視角下的座標）
-     * 
-     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @param otherPlayer 在當前玩家視角下的其他玩家相對位置 (0:左下, 1:左上, 2:右上, 3:右下)
-     * @param startIndex 其他玩家在**基本盤路徑**上的起點索引
-     * @param steps 移動步數
-     * @returns 路徑段陣列（包含起點和終點，均為當前玩家視角下的座標），如果超出路徑返回 null
+     * 依照真實座位與目前畫面上的起始座標取得目的座標。
+     *
+     * 這個 API 會先用 pos 反查該玩家目前視角路徑中的 index，再依照 steps 取得目的座標。
+     *
+     * @param chairId 真實座位 / 玩家 index。
+     * @param pos 目前玩家視角下的起始棋盤座標 [row, col]。
+     * @param steps 要前進的步數。
+     * @returns 目前玩家視角下的目的座標 [row, col]，若座標不在路徑上或超出範圍則回傳 null。
      */
-    public getOtherPlayerDestToGlobalSegment(
-        playerView: number,
-        otherPlayer: number,
-        startIndex: number,
-        steps: number
-    ): number[][] | null {
-        return this._factoryManager.getViewTransformer()?.getOtherPlayerDestToGlobalSegment(
-            playerView,
-            otherPlayer,
-            startIndex,
+   public getPathCoordInViewByPos(chairId: number, pos: [number, number], steps: number): [number, number] | null{
+        return this._factoryManager.getViewTransformer()?.getPathCoordInViewByPos(
+            chairId,
+            pos,
             steps
         ) ?? null;
-    }
+   }
+
+
+   /**
+    * 依照真實座位與目前畫面上的起始座標取得移動路徑片段。
+    *
+    * 這個 API 會先用 pos 反查該玩家目前視角路徑中的 index，再依照 steps 取得路徑片段。
+    *
+    * @param chairId 真實座位 / 玩家 index。
+    * @param pos 目前玩家視角下的起始棋盤座標 [row, col]。
+    * @param steps 要前進的步數。
+    * @returns 目前玩家視角下的路徑座標陣列，包含起點與終點；若座標不在路徑上或超出範圍則回傳 null。
+    */
+   public getPathSegmentInViewByPos(chairId: number, pos: [number, number], steps: number): number[][] | null {
+        return this._factoryManager.getViewTransformer()?.getPathSegmentInViewByPos(
+            chairId,
+            pos,
+            steps
+        ) ?? null;
+   }
+
+
 
     // ========== 基地坑位相關 API ==========
 
-    /**
-     * <移動>
-     * 根據 Slot ID 獲取指定玩家視角下的基地坑位座標 
-     * @param playerView 當下玩家本身的視角
-     * @param slotIndex 基地棋子編號
-     * @returns 
+     /**
+     * 根據玩家座位索引和坑位索引取得指定<玩家視角>下的基地坑位座標
+     * 基本盤未旋轉的座標參照
+     * @param chairIndex 玩家座位索引
+     * @param slotIndex 坑位索引
+     * @returns 指定玩家視角下的基地坑位座標 [row, col]，如果找不到返回 null
      */
-    public getCurrentPlayerBSToGlobal(playerView: number, slotIndex: number): [number, number] | null {
-        return this._factoryManager.getViewTransformer()?.getBaseSlotInView(playerView, slotIndex) ?? null;
+    public getPlayerBaseBySlotIndex(chairIndex:number, slotIndex:number):[number,number] | null{
+        return this._factoryManager.getViewTransformer()?.getPlayerBaseBySlotIndex(chairIndex, slotIndex) ?? null;
+    }
+
+    /**
+     * 根據玩家座位索引和坑位索引取得指定<玩家視角>下的基地坑位 slotId
+     * @param chairIndex 玩家座位索引
+     * @param slotIndex 坑位索引
+     * @returns 指定玩家視角下的基地坑位 ID，如果找不到返回 null
+     */
+    public getPlayerSlotIdBySlotIndex(chairIndex:number, slotIndex:number):number | null{
+        return this._factoryManager.getViewTransformer()?.getPlayerSlotIdBySlotIndex(chairIndex, slotIndex) ?? null;
+    }
+
+    
+    /**
+     * 根據玩家座位索引和坑位 ID 取得指定<玩家視角>下的基地坑位座標
+     * @param chairIndex 要取得的玩家座位索引
+     * @param slotId 坑位 ID
+     * @returns 指定玩家視角下的基地坑位座標 [row, col]，如果找不到返回 null
+     */
+    public getPlayerBaseBySlotId(chairIndex:number, slotId:number):[number,number] | null {
+        return this._factoryManager.getViewTransformer()?.getPlayerBaseBySlotId(chairIndex, slotId) ?? null;
+    }
+    
+    
+    /**
+     * 取得玩家視角下的基地坑位 ID 列表
+     * @param chairIndex 座位索引
+     * @returns 指定玩家視角下的基地坑位 ID 列表，如果找不到返回 null
+     */
+    public getPlayerSlotIdList(chairIndex:number):number[] | null {
+        return this._factoryManager.getViewTransformer()?.getPlayerSlotIdList(chairIndex) ?? null;
     }
     
     /**
-     * <移動>
-     * <以指定玩家的視角來看>:
-     * 透過slotId來取得這個視角下的基地坑位座標
-     * e.g:
-     * 玩家視角是黃色(3),要取得紅色(1)玩家的slotId=-6的基地坑位座標-5 ~ -8
-     * 就會換算旋轉下的座標回傳
-     * @param playerType 希望取得的玩家類型 (0:藍, 1:紅, 2:綠, 3:黃)
-     * @param slotId 坑位 ID（負數，如 -1, -2, ..., -16）
-     * @param playerView 玩家的視角
-     * @returns 玩家視角下的基地坑位座標 [row, col]，如果找不到則返回 null
+     * 取得玩家視角下的基地坑位座標列表
+     * @param chairIndex 座位索引
+     * @returns 指定玩家視角下的基地坑位座標列表，如果找不到返回 null
      */
-    public getPlayerBSToGlobalByCurrentView(playerType: number,slotId: number,playerView: number ): [number, number] | null {
-        return this._factoryManager.getViewTransformer()?.getBaseSlotByCurrentView(playerType,slotId,playerView) ?? null;
+    public getPlayerBaseList(chairIndex:number):[number,number][] | null {
+        return this._factoryManager.getViewTransformer()?.getPlayerBaseList(chairIndex) ?? null;
     }
 
-    /**
-     * <移動>
-     * 根據 Slot ID 獲取指定玩家視角下的基地坑位座標（自動從 Slot ID 換算玩家類型）
-     * 
-     * 此方法會自動從 Slot ID 計算出對應的玩家類型，無需手動傳入 playerType
-     * 
-     * @param slotId 坑位 ID（負數，如 -1, -2, ..., -16）
-     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @returns 玩家視角下的基地坑位座標 [row, col]，如果找不到則返回 null
-     */
-    public getOtherPlayerBSByIdToGlobal(slotId: number, playerView: number): [number, number] | null {
-        return this._factoryManager.getViewTransformer()?.getBaseSlotInViewById(slotId, playerView) ?? null;
-    }
-
-    /**
-     * <移動>
-     * 獲取所有玩家的基地坑位在某個視角下的座標
-     * (用來取得初始狀態所有玩家基地坑位的座標，或是結束遊戲時顯示所有玩家基地坑位的座標) 
-     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @returns 所有玩家的基地坑位座標映射（按玩家類型分組），如果找不到則返回 null
-     */
-    public getAllBSListByCurrentView(playerView: number): Record<number, number[][]> | null {
-        return this._factoryManager.getViewTransformer()?.getAllBaseSlotsByCurrentView(playerView) ?? null;
-    }
+  
 
     // ========== Slot ID 查詢 API ==========
-
-    /**
-     * 獲取指定玩家的所有 Slot ID
-     * 
-     * @param playerType 玩家類型 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @returns 該玩家的 Slot ID 陣列，如 [-1, -2, -3, -4]
-     * 
-     * 範例：
-     * ```typescript
-     * const blueSlots = ludoGameManager.getPlayerSlotIds(0);
-     * // 返回 [-1, -2, -3, -4]
-     * 
-     * const redSlots = ludoGameManager.getPlayerSlotIds(1);
-     * // 返回 [-5, -6, -7, -8]
-     * ```
+      /**
+     * 取得玩家本身的基地坑位 ID 列表（玩家視角下）
+     * @param playerView 玩家視角
      */
-    public getPlayerSlotIds(playerType: number): number[] | null {
-        return this._factoryManager.getViewTransformer()?.getPlayerSlotIds(playerType) ?? null;
+    public getPlayerBSIdList(playerView:number):number[] | null {
+        return this._factoryManager.getViewTransformer()?.getPlayerBSIdList(playerView) ?? null;
     }
+   
+    public getAllSlotIds(): number[][] | null {
+        return this._factoryManager.getViewTransformer()?.getAllSlotIds() ?? null;
+    }
+   
+  
+   
 
-    /**
-     * 根據 Slot ID 反查玩家類型和在該玩家陣列中的索引
+   
+      /**
+     * 將 Slot ID 轉換為玩家類型和陣列索引(為轉換座位前)
+     * 
+     * 轉換規則：
+     * -(playerType=0): -1~-4 → 陣列索引 0~3
+     * -(playerType=1): -5~-8 → 陣列索引 0~3
+     * -(playerType=2): -9~-12 → 陣列索引 0~3
+     * - (playerType=3): -13~-16 → 陣列索引 0~3
      * 
      * @param slotId 坑位 ID（負數，如 -1, -2, ..., -16）
-     * @returns { playerType: 玩家類型, index: 在該玩家陣列中的索引 }，如果找不到則返回 null
-     * 
-     * 範例：
-     * ```typescript
-     * // 查詢 -2 屬於哪個玩家的第幾個坑位
-     * const info = ludoGameManager.getSlotInfo(-2);
-     * // 返回 { playerType: 0, index: 1 }  (Blue 的第 2 個坑位，索引從 0 開始)
-     * 
-     * // 查詢 -6 屬於哪個玩家
-     * const info2 = ludoGameManager.getSlotInfo(-6);
-     * // 返回 { playerType: 1, index: 1 }  (Red 的第 2 個坑位)
-     * 
-     * // 用於 Server 通信：當玩家點擊某個棋子時
-     * const clickedSlotId = -3;
-     * const slotInfo = ludoGameManager.getSlotInfo(clickedSlotId);
-     * if (slotInfo) {
-     *     console.log(`玩家 ${slotInfo.playerType} 的第 ${slotInfo.index + 1} 個棋子被點擊`);
-     *     // 發送給 Server: { playerId: slotInfo.playerType, pieceIndex: slotInfo.index }
-     * }
-     * ```
+     * @returns 包含 playerIndex（玩家索引）和 slotIndex（在該玩家陣列中的索引）的物件，如果 slotId 無效則返回 null
      */
-    public getSlotInfo(slotId: number): { playerType: number, index: number } | null {
-        return this._factoryManager.getViewTransformer()?.getSlotInfo(slotId) ?? null;
-    }
-
-    /**
-     * 將 Slot ID 轉換為玩家類型和陣列索引（元組格式）
-     * 
-     * @param slotId 坑位 ID（負數，如 -1, -2, ..., -16）
-     * @returns [玩家類型, 陣列索引]，如果 slotId 無效則返回 null
-     * 
-     * 注意：此方法返回元組 [playerType, index]，如果需要對象格式請使用 getSlotInfo()
-     * 
-     * 範例：
-     * ```typescript
-     * const result = ludoGameManager.slotIdToIndex(-6);
-     * // 返回 [1, 1] - [playerType, index]
-     * 
-     * if (result) {
-     *     const [playerType, index] = result;
-     *     console.log(`玩家 ${playerType} 的第 ${index + 1} 個棋子`);
-     * }
-     * ```
-     */
-    public slotIdToIndex(slotId: number): [number, number] | null {
+    public slotIdToIndex(slotId: number): { playerIndex: number, slotIndex: number } | null {
         return this._factoryManager.getViewTransformer()?.slotIdToIndex(slotId) ?? null;
     }
 
-    /**
-     * 根據玩家類型和陣列索引生成 Slot ID
-     * 
-     * @param playerType 玩家類型 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @param arrayIndex 陣列索引 (0~3)
-     * @returns Slot ID（負數）
-     * 
-     * 範例：
-     * ```typescript
-     * // Server 返回數據: { playerId: 1, pieceIndex: 1 }
-     * const slotId = ludoGameManager.indexToSlotId(1, 1);
-     * // 返回 -6
-     * 
-     * // 用於初始化：為每個玩家的棋子生成 Slot ID
-     * for (let playerType = 0; playerType < 4; playerType++) {
-     *     for (let index = 0; index < 4; index++) {
-     *         const slotId = ludoGameManager.indexToSlotId(playerType, index);
-     *         console.log(`玩家 ${playerType} 的第 ${index + 1} 個棋子 Slot ID: ${slotId}`);
-     *     }
-     * }
-     * 
-     * // Server 通信場景
-     * function onServerPieceMove(data: { playerId: number, pieceIndex: number, steps: number }) {
-     *     const slotId = ludoGameManager.indexToSlotId(data.playerId, data.pieceIndex);
-     *     const pieceNode = findPieceBySlotId(slotId);
-     *     movePiece(pieceNode, data.steps);
-     * }
-     * ```
-     */
-    public indexToSlotId(playerType: number, arrayIndex: number): number {
-        const transformer = this._factoryManager.getViewTransformer();
-        if (!transformer) {
-            console.error('[LudoGameManager] ViewTransformer 未初始化');
-            return 0;
-        }
-        return transformer.indexToSlotId(playerType, arrayIndex);
-    }
+  
     
     // ========== 通用 API ==========
     
