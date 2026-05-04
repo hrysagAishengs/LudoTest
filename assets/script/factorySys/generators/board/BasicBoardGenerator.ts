@@ -120,6 +120,40 @@ export class BasicBoardGenerator implements IBoardGenerator{
         return transform.convertToWorldSpaceAR(localPos);
     }
 
+    /**
+     * 
+     * @param startRow 左下開始的 row 索引 (例如 0)
+     * @param startCol 左下開始的 col 索引 (例如 0)
+     * @param width 區域的寬度 (例如 3)
+     * @param height 區域的高度 (例如 3)
+     * @returns 區域中心的本地座標
+     */
+    public getAreaCenterPosition(startRow: number, startCol: number, width: number, height: number): Vec3 {
+        const centerRow = startRow + (height - 1) / 2;
+        const centerCol = startCol + (width - 1) / 2;
+        const offset = (this._gridSize - 1) * this.CELL_SPACING / 2;
+        const posX = centerCol * this.CELL_SPACING - offset;
+        const posY = centerRow * this.CELL_SPACING - offset;
+        return new Vec3(posX, posY, 0);
+    }
+
+    /**
+     * 
+     * @param startRow 左下開始 row 索引 (例如 0)
+     * @param startCol 左下開始 col 索引 (例如 0)
+     * @param width 區域的寬度 (例如 3)
+     * @param height 區域的高度 (例如 3)
+     * @returns 區域中心的世界座標
+     */
+    public getAreaCenterWorldPosition(startRow: number, startCol: number, width: number, height: number): Vec3 {
+        const localPos = this.getAreaCenterPosition(startRow, startCol, width, height);
+        const transform = this.nodeContainer?.getComponent(UITransform);
+        if (!transform) {
+            return localPos;
+        }
+        return transform.convertToWorldSpaceAR(localPos);
+    }
+
     public getAllBaseSlotPositions(): Vec3[][] {
         /**
          *  blue (左下)：傳入 (1, 1), (1, 3), (3, 1), (3, 3)

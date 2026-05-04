@@ -14,10 +14,22 @@ export interface IPlayerIdentity {
     nickname: string;
     /** 玩家頭像圖片 */
     avatarSpriteFrame: SpriteFrame | null;
-    /** 原始座位編號 (Server 分配) */
+    /** 
+     * 原始座位編號 (Server 分配) 
+     * 找玩家資料
+    */
     seatIndex?: number;
-
-    localViewIndex?: number; // 本地視角座位編號 (0~3)，根據玩家數量和座位分配計算得出
+    /**
+     * 2人局虛擬座位索引（0或1），因為要用於對角線分配座位,但server位置是連續的，
+     * 所以需要一個假的位置所引來讓玩家強迫分到對角線的位置
+     * <找棋盤 / 路徑 / base slot>
+     */
+    playIndex?: number;
+    /**
+     * 本地視角座位編號 (0~3)，根據玩家數量和座位分配計算得出
+     * 找 UI 位置
+     */
+    localViewIndex?: number; 
     /** 棋盤顏色（客戶端隨機分配：0=Blue, 1=Red, 2=Green, 3=Yellow） */
     playerColor?: PlayerColor;
     isPlayerOwner?: boolean; // 是否為玩家本人

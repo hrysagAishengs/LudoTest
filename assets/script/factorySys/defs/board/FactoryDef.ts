@@ -29,6 +29,8 @@ export interface IBoardGenerator {
     getBaseSlotPosition(r: number, c: number):Vec3;
     //-獲取玩家基地坑位的世界位置(放置旗子的地方)
     getBaseSlotWorldPosition(r: number, c: number): Vec3;
+    getAreaCenterPosition(startRow: number, startCol: number, width: number, height: number): Vec3;
+    getAreaCenterWorldPosition(startRow: number, startCol: number, width: number, height: number): Vec3;
     //-獲取所有格子位置
     getAllPositions(): Vec3[][];
     //-獲取所有玩家基地坑位的位置

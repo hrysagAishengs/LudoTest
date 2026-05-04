@@ -2,15 +2,14 @@ import { _decorator, Component, Node, Vec3, Vec2, instantiate, UITransform, Labe
 import { LudoGameMode } from '../gameDef/GameDef';
 import { GameModeFactory, IGameComponents, IGameModeConfig } from '../factorySys/defs/GameModeFactoryDef';
 import { ClassicGameModeFactory } from '../factorySys/factorys/ClassicGameModeFactory';
-import { GameModeConfig, GameModePropertyType, MapDecorationItem, MarkerDirection } from '../factorySys/component/ConfigProperty';
+import { GameModeConfig, GameModePropertyType, MapDecorationItem, MarkerDirection, RoomConfigGroup, SeatAreaConfig } from '../factorySys/component/ConfigProperty';
 import { IBoardGenerator } from '../factorySys/defs/board/FactoryDef';
 import { IPathGenerator, IViewTransformer } from '../factorySys/defs/path/PathFactoryDef';
 import { GameMapCenter } from '../gameMap/GameMapCenter';
 import { GameMapDecorator } from '../gameMap/GameMapDecorator';
-import { RoomPlayerManager } from '../roomManager/RoomPlayerManager';
 import { IGridData, IMarker, MarkerType, GridState } from '../gameMap/def/GameMapDef';
-import { IPlayerIdentity } from '../gamePlayer/def/PlayerDataDef';
 import { AniSysManager } from '../aniPresentSys/AniSysManager';
+import { PlayerColor } from '../gamePlayer/ColorSelector';
 
 const { ccclass, property } = _decorator;
 
@@ -52,8 +51,6 @@ export class GameFactoryManager extends Component {
         visible: true
     })
     private _gameModeConfig: GameModeConfig[] = [new GameModeConfig()];
-    
-
     private _currentFactory: GameModeFactory | null = null;
     private _currentComponents: IGameComponents | null = null;
     private _currentGameMode: LudoGameMode = LudoGameMode.DEFAULT;
@@ -65,7 +62,7 @@ export class GameFactoryManager extends Component {
     private _mapDecorator: GameMapDecorator | null = null;
     
     // 房間玩家管理器
-    private _roomPlayerManager: RoomPlayerManager | null = null;
+    //private _roomPlayerManager: RoomPlayerManager | null = null;
     
     // 背景容器節點引用（用於視角旋轉）
     private _bgContainerNode: Node | null = null;
@@ -78,6 +75,7 @@ export class GameFactoryManager extends Component {
     
     // 基準旋轉值（隨機基本盤的顏色索引）
     private _baseColorRotation: number = 0;
+    private _roomMaxPlayerCount: number = 4;
     
     // 工廠註冊表
     private readonly FACTORY_REGISTRY = new Map<LudoGameMode, new () => GameModeFactory>([
@@ -157,16 +155,17 @@ export class GameFactoryManager extends Component {
      * @param playerCount - 玩家數量 (2/3/4)
      */
     public setupRoom(playerCount: number): void {
+        this._roomMaxPlayerCount = playerCount;
         if (playerCount < 2 || playerCount > 4) {
             console.error(`[GameFactoryManager] 無效的 playerCount: ${playerCount}，應在 2-4 之間`);
             return;
         }
         
         // 初始化房間管理器
-        this.initializeRoomManager(playerCount);
+        //this.initializeRoomManager(playerCount);
         
         // 設置隨機基本盤
-        this.setupRandomBaseboard();
+        //this.setupRandomBaseboard();
         
         // 【新增】創建路徑調試面板（如果配置了）
         const propertyMode = this.convertToPropertyMode(this._currentGameMode);
@@ -193,23 +192,25 @@ export class GameFactoryManager extends Component {
      * ```
      */
     public setupRoomWithColorIndex(playerCount: number, colorCombinationIndex: number): void {
+        this._roomMaxPlayerCount = playerCount;
+        
         if (playerCount < 2 || playerCount > 4) {
             console.error(`[GameFactoryManager] 無效的 playerCount: ${playerCount}，應在 2-4 之間`);
             return;
         }
-        
+        /*
         if (colorCombinationIndex < 0 || colorCombinationIndex > 3) {
             console.error(`[GameFactoryManager] 無效的 colorCombinationIndex: ${colorCombinationIndex}，應在 0-3 之間`);
             return;
-        }
+        }*/
         
         console.log(`[GameFactoryManager] 【測試模式】設置房間：${playerCount}人局，顏色排列索引=${colorCombinationIndex}`);
         
         // 初始化房間管理器（使用指定的顏色排列）
-        this.initializeRoomManagerWithColorIndex(playerCount, colorCombinationIndex);
+        //this.initializeRoomManagerWithColorIndex(playerCount, colorCombinationIndex);
         
         // 設置隨機基本盤
-        this.setupRandomBaseboard();
+        //this.setupRandomBaseboard();
         
         // 【新增】創建路徑調試面板（如果配置了）
         const propertyMode = this.convertToPropertyMode(this._currentGameMode);
@@ -222,79 +223,7 @@ export class GameFactoryManager extends Component {
         console.log(`[GameFactoryManager] 【測試模式】房間設置完成：${playerCount} 人局，顏色排列索引=${colorCombinationIndex}`);
     }
     
-    /**
-     * 初始化房間管理器
-     * @param playerCount - 玩家數量
-     * @private
-     */
-    private initializeRoomManager(playerCount: number): void {
-        // 獲取當前模式的配置
-        console.log(`[GameFactoryManager] 當前遊戲模式: ${LudoGameMode[this._currentGameMode]}`);
-        const propertyMode = this.convertToPropertyMode(this._currentGameMode);
-        console.log(`[GameFactoryManager] 查找配置模式: ${GameModePropertyType[propertyMode]}`);
-    
-        const editorConfig = this._gameModeConfig.find(c => c.gameMode === propertyMode);
-        
-        console.log(`[GameFactoryManager] 找到配置:`, editorConfig ? '是' : '否');
-        console.log(`[GameFactoryManager] roomPanelConfig 存在:`, editorConfig?.roomPanelConfig ? '是' : '否');
-        console.log(`[GameFactoryManager] roomPanelConfig 長度:`, editorConfig?.roomPanelConfig?.length);
-        if (!editorConfig || !editorConfig.roomPanelConfig || editorConfig.roomPanelConfig.length === 0) {
-            console.error('[GameFactoryManager] 未找到房間配置');
-            return;
-        }
-        
-        // 清理舊的房間管理器
-        if (this._roomPlayerManager) {
-            this._roomPlayerManager.clear();
-            this._roomPlayerManager = null;
-        }
-        
-        // 創建新的房間管理器
-        this._roomPlayerManager = new RoomPlayerManager();
-        
-        // 從配置初始化
-        this._roomPlayerManager.initializeFromConfig(editorConfig.roomPanelConfig, playerCount);
-        
-        console.log('[GameFactoryManager] 房間管理器初始化完成');
-    }
-    
-    /**
-     * 初始化房間管理器（測試模式：指定顏色排列索引）
-     * @param playerCount - 玩家數量
-     * @param colorCombinationIndex - 顏色排列索引
-     * @private
-     */
-    private initializeRoomManagerWithColorIndex(playerCount: number, colorCombinationIndex: number): void {
-        // 獲取當前模式的配置
-        console.log(`[GameFactoryManager] 當前遊戲模式: ${LudoGameMode[this._currentGameMode]}`);
-        const propertyMode = this.convertToPropertyMode(this._currentGameMode);
-        console.log(`[GameFactoryManager] 查找配置模式: ${GameModePropertyType[propertyMode]}`);
-    
-        const editorConfig = this._gameModeConfig.find(c => c.gameMode === propertyMode);
-        
-        console.log(`[GameFactoryManager] 找到配置:`, editorConfig ? '是' : '否');
-        console.log(`[GameFactoryManager] roomPanelConfig 存在:`, editorConfig?.roomPanelConfig ? '是' : '否');
-        console.log(`[GameFactoryManager] roomPanelConfig 長度:`, editorConfig?.roomPanelConfig?.length);
-        if (!editorConfig || !editorConfig.roomPanelConfig || editorConfig.roomPanelConfig.length === 0) {
-            console.error('[GameFactoryManager] 未找到房間配置');
-            return;
-        }
-        
-        // 清理舊的房間管理器
-        if (this._roomPlayerManager) {
-            this._roomPlayerManager.clear();
-            this._roomPlayerManager = null;
-        }
-        
-        // 創建新的房間管理器
-        this._roomPlayerManager = new RoomPlayerManager();
-        
-        // 【測試模式】從配置初始化（使用指定的顏色排列索引）
-        this._roomPlayerManager.initializeWithColorIndex(editorConfig.roomPanelConfig, playerCount, colorCombinationIndex);
-        
-        console.log('[GameFactoryManager] 房間管理器初始化完成（測試模式）');
-    }
-    
+  
     /**
      * 初始化地圖管理中心
      * 從 BoardGenerator 獲取節點和位置數據，構建地圖數據結構
@@ -522,27 +451,9 @@ export class GameFactoryManager extends Component {
             this._mapDecorator.updateArrowRotations();
         }
         
-        const colorNames = ['Blue', 'Red', 'Green', 'Yellow'];
         console.log(`[GameFactoryManager] 本機玩家視角設置完成：座位 ${localPlayerSeatIndex}，總旋轉 ${finalAngle}度 (基準${this._baseColorRotation * 90}度 + 座位${localPlayerSeatIndex * 90}度)`);
     }
     
-    
-    public addPlayer(value:IPlayerIdentity,seatIndex:number):void{
-        
-        const viewTransformer = this.getViewTransformer();
-        if (!viewTransformer) return;
-
-        const localViewIndex=viewTransformer.getLocalViewIndex(seatIndex);
-        const isPlayer=viewTransformer.isCurrentPlayerView(seatIndex);
-        value.seatIndex=seatIndex;
-        value.localViewIndex=localViewIndex;
-        value.isPlayerOwner=isPlayer;
-        
-        if(this._roomPlayerManager){
-            this._roomPlayerManager.addPlayer(value);
-        }
-
-    }
     // ========== 隨機基本盤與數據重映射 ==========
     
     /**
@@ -550,6 +461,7 @@ export class GameFactoryManager extends Component {
      * @private
      */
     private saveOriginalData(): void {
+        
         const viewTransformer = this.getViewTransformer();
         if (!viewTransformer) {
             console.warn('[GameFactoryManager] ViewTransformer 不存在，無法保存原始數據');
@@ -564,9 +476,6 @@ export class GameFactoryManager extends Component {
         
         // 深拷貝保存原始路徑數據
         this._originalPathMap = JSON.parse(JSON.stringify(pathGenerator.getPathMap()));
-        
-       
-        
         // 深拷貝保存原始基地座標數據
         const baseSlotMap: Record<number, number[][]> = {};
         for (let playerType = 0; playerType < 4; playerType++) {
@@ -624,27 +533,16 @@ export class GameFactoryManager extends Component {
      * 使用座位0的顏色作為基本盤顏色（由 RoomPlayerManager 隨機分配）
      * @public
      */
-    public setupRandomBaseboard(): void {
-        // 1. 獲取亂數池0的顏色作為基本盤顏色（保證與實際分配一致）
-        const seat0Color = this._roomPlayerManager.getSeatColor(0);
-        if (seat0Color === undefined) {
-            console.error('[GameFactoryManager] 無法獲取座位0的顏色，隨機基本盤設置失敗');
-            return;
-        }
-        this._baseColorRotation = seat0Color;
+    public setupBaseboardByBaseColor(baseColor: PlayerColor): void {
         
-        const colorNames = ['Blue', 'Red', 'Green', 'Yellow'];
-        console.log(`[GameFactoryManager] 基本盤顏色（座位0）: ${seat0Color} (${colorNames[seat0Color]})`);
-        
+        this._baseColorRotation = baseColor;
         // 2. 重映射所有數據
-        this.remapAllDataByBaseColor(seat0Color);
+        this.remapAllDataByBaseColor(baseColor);
         
         // 3. 【第一次旋轉底圖】對齊底圖圖案和數據
         if (this._bgContainerNode) {
-            this._bgContainerNode.setRotationFromEuler(0, 0, seat0Color * 90);
-            console.log(`[GameFactoryManager] 底圖已旋轉 ${seat0Color * 90}度對齊 ${colorNames[seat0Color]} 顏色`);
+            this._bgContainerNode.setRotationFromEuler(0, 0, baseColor * 90);
         }
-        
         // 4. 重新應用裝飾（使用重映射後的數據）
         this.reapplyDecorations();
         
@@ -685,15 +583,7 @@ export class GameFactoryManager extends Component {
         
         // 【新增】將原始路徑傳遞給 ViewTransformer（用於 getOtherPlayerDestToGlobal）
         viewTransformer.setOriginalPathContent(this._originalPathMap);
-        //--test--
-        //const pathGenerator = this.getPathGenerator();
-        //const oldPathMap = JSON.parse(JSON.stringify(pathGenerator.getPathMapOld()));
-        //viewTransformer.setOriginalPathContentOld(oldPathMap);
-
-        // 將重映射後的路徑傳遞給 ViewTransformer
-        //viewTransformer.setPathContent(newPathMap);
-        
-     
+      
         //  設置基地座標數據（不重映射，保持 index 順序）
         if (this._originalBaseMap) {
             // 將原始基地傳遞給 ViewTransformer（用於所有查詢）
@@ -960,11 +850,13 @@ export class GameFactoryManager extends Component {
     }
     
     /**
-     * 獲取房間玩家管理器
-     * @returns 房間玩家管理器，如果未初始化則返回 null
+     * NEW 獲取房間面板配置
+     * @returns 
      */
-    public getRoomPlayerManager(): RoomPlayerManager | null {
-        return this._roomPlayerManager;
+    public getRoomPanelConfig(): RoomConfigGroup[] {
+        const propertyMode = this.convertToPropertyMode(this._currentGameMode);
+        const editorConfig = this._gameModeConfig.find(c => c.gameMode === propertyMode);
+        return editorConfig?.roomPanelConfig ?? [];
     }
     
     // ========== 通用 API ==========
@@ -972,6 +864,55 @@ export class GameFactoryManager extends Component {
     /**
      * 獲取特定組件（高級用法）
      */
+    /**
+     * 抽出玩家視角下的base區域中心點local座標
+     * @param localViewIndex 玩家視角索引(要用tableIndex去換算)
+     * @returns 區域中心的本地座標，如果無法獲取則返回 null
+     */
+    public getAreaCenterPosition(localViewIndex: number): Vec3 | null {
+        const seatConfig = this.getSeatAreaConfigByLocalViewIndex(localViewIndex);
+        const boardGenerator = this.getBoardGenerator();
+        if (!seatConfig || !boardGenerator) {
+            return null;
+        }
+
+        return boardGenerator.getAreaCenterPosition(
+            seatConfig.startRow,
+            seatConfig.startCol,
+            seatConfig.width,
+            seatConfig.height
+        );
+    }
+
+    /**
+     * 抽出玩家視角下的base區域中心點world座標
+     * @param localViewIndex 玩家視角索引(要用tableIndex去換算)
+     * @returns 區域中心的世界座標，如果無法獲取則返回 null
+     */
+    public getAreaCenterWorldPosition(localViewIndex: number): Vec3 | null {
+        const seatConfig = this.getSeatAreaConfigByLocalViewIndex(localViewIndex);
+        const boardGenerator = this.getBoardGenerator();
+        if (!seatConfig || !boardGenerator) {
+            return null;
+        }
+
+        return boardGenerator.getAreaCenterWorldPosition(
+            seatConfig.startRow,
+            seatConfig.startCol,
+            seatConfig.width,
+            seatConfig.height
+        );
+    }
+
+    private getSeatAreaConfigByLocalViewIndex(localViewIndex: number): SeatAreaConfig | null {
+        const propertyMode = this.convertToPropertyMode(this._currentGameMode);
+        const editorConfig = this._gameModeConfig.find(c => c.gameMode === propertyMode);
+        const seatConfigGroup = editorConfig?.boardBaseConfig?.find(config => config.activePlayerCount === this._roomMaxPlayerCount)
+            ?? editorConfig?.boardBaseConfig?.[0];
+
+        return seatConfigGroup?.seats?.find(seat => seat.seatIndex === localViewIndex) ?? null;
+    }
+
     public getComponent<T extends keyof IGameComponents>(componentName: T): IGameComponents[T] | null {
         return this._currentFactory?.getComponent(componentName) ?? null;
     }
@@ -1022,12 +963,7 @@ export class GameFactoryManager extends Component {
             this._gameMapCenter = null;
         }
         
-        // 清理房間管理器
-        if (this._roomPlayerManager) {
-            this._roomPlayerManager.clear();
-            this._roomPlayerManager = null;
-        }
-        
+       
         console.log('遊戲模式已清理');
     }
     

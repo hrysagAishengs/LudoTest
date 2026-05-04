@@ -5,6 +5,7 @@ import { IPlayerIdentity } from './gamePlayer/def/PlayerDataDef';
 import { AniSysManager } from './aniPresentSys/AniSysManager';
 import { IPawnInfo } from './gamePlayer/def/PawnDef';
 import { Pawn } from './gamePlayer/Pawn';
+import { RoomPlayerManager } from './roomManager/RoomPlayerManager';
 const { ccclass, property } = _decorator;
 
 /**
@@ -46,6 +47,9 @@ export class LudoGameManager extends Component {
     
     @property({type:AniSysManager,displayName:"動畫系統管理器",tooltip:"負責管理動畫系統的組件",visible:true})
     private _aniSysManager: AniSysManager = null!;
+
+    private _roomPlayerManager: RoomPlayerManager;
+    private _roomMaxPlayerCount: number = 4;
     /*
     @property({type:BoardGeneratorManager,displayName:"棋盤生成管理器",tooltip:"負責管理棋盤生成的組件",visible:true})
     private _boardGeneratorManager: BoardGeneratorManager = null!;
@@ -60,6 +64,7 @@ export class LudoGameManager extends Component {
      */
     public async initGame(gameMode: LudoGameMode): Promise<void> {
         await this._factoryManager.initGameMode(gameMode);
+      
         console.log(`[LudoGameManager] 遊戲模式 ${LudoGameMode[gameMode]} 初始化完成`);
     }
     
@@ -69,8 +74,57 @@ export class LudoGameManager extends Component {
      */
     public setupRoom(playerCount: number): void {
         this._factoryManager.setupRoom(playerCount);
+        this.initializeRoomManager(playerCount);
         console.log(`[LudoGameManager] 房間設置完成：${playerCount} 人局`);
     }
+
+    private initializeRoomManager(playerCount: number):void{
+        
+        const roomConfigs = this._factoryManager.getRoomPanelConfig();
+        if (!roomConfigs) {
+            console.error('[LudoGameManager] 無法獲取房間配置，請確保工廠管理器已正確設置房間');
+            return;
+        }
+        if (this._roomPlayerManager) {
+            this._roomPlayerManager.clear();
+            this._roomPlayerManager = null;
+        }
+        this._roomPlayerManager = new RoomPlayerManager(); 
+        this._roomMaxPlayerCount = playerCount;
+        this._roomPlayerManager.initializeFromConfig(roomConfigs, playerCount);
+
+        const seat0Color = this._roomPlayerManager.getSeatColor(0);
+        if (seat0Color === undefined) {
+            console.error('[LudoGameManager] 無法取得 seat 0 color');
+            return;
+        }
+        const colorNames = ['Blue', 'Red', 'Green', 'Yellow'];
+        console.log(`[GameFactoryManager] 基本盤顏色（座位0）: ${seat0Color} (${colorNames[seat0Color]})`);
+
+        this._factoryManager.setupBaseboardByBaseColor(seat0Color);
+    }
+
+    private initializeRoomManagerWithColorIndex(playerCount: number, colorCombinationIndex: number): void
+    {
+        const roomConfigs = this._factoryManager.getRoomPanelConfig();
+        
+        if (this._roomPlayerManager) {
+            this._roomPlayerManager.clear();
+            this._roomPlayerManager = null;
+        }
+        this._roomPlayerManager = new RoomPlayerManager(); 
+        this._roomMaxPlayerCount = playerCount;
+        this._roomPlayerManager.initializeWithColorIndex(roomConfigs, playerCount, colorCombinationIndex);
+        const seat0Color = this._roomPlayerManager.getSeatColor(0);
+        if (seat0Color === undefined) {
+            console.error('[LudoGameManager] 無法取得 seat 0 color');
+            return;
+        }
+
+        this._factoryManager.setupBaseboardByBaseColor(seat0Color);
+
+    }
+        
     
     /**
      * 測試方法：設置房間並指定顏色排列索引
@@ -120,6 +174,49 @@ export class LudoGameManager extends Component {
      */
     public async initGameMode(gameMode: LudoGameMode): Promise<void> {
         return this.initGame(gameMode);
+    }
+
+    /**
+     * 
+     * @param identity 玩家身份信息
+     * @param seatIndex 座位索引
+     * @returns 
+     */
+    public addPlayer(identity: IPlayerIdentity, seatIndex: number): void {
+        
+        const viewTransformer = this._factoryManager.getViewTransformer();
+        if (!viewTransformer) return;
+
+        const fake2PIndex = this.getFake2PIndex(seatIndex);
+
+        identity.seatIndex = seatIndex;
+        identity.playIndex = this._roomMaxPlayerCount === 2 ? fake2PIndex : -1;
+        identity.localViewIndex = viewTransformer.getLocalViewIndex(fake2PIndex);
+        identity.isPlayerOwner = viewTransformer.isCurrentPlayerView(seatIndex);
+
+        this._roomPlayerManager?.addPlayer(identity);
+    }
+
+    private getFake2PIndex(seatIndex: number): number {
+        if (this._roomMaxPlayerCount !== 2) {
+            return seatIndex;
+        }
+
+        const viewTransformer = this._factoryManager.getViewTransformer();
+        if (!viewTransformer) {
+            return seatIndex;
+        }
+
+        if (viewTransformer.isCurrentPlayerView(seatIndex)) {
+            return seatIndex;
+        }
+
+        const playerSeatIndex = viewTransformer.getRealIndexFromView(0);
+        if (playerSeatIndex < 0) {
+            return seatIndex;
+        }
+
+        return (playerSeatIndex + 2) % 4;
     }
 
     //--廢棄
@@ -172,14 +269,16 @@ export class LudoGameManager extends Component {
         const roomMaxPlayerCount = 4;
         
         this.setupRoomWithColorIndex(roomMaxPlayerCount, 3);
+        //--new 20260504
+        this.initializeRoomManagerWithColorIndex(roomMaxPlayerCount, 3);
      
         // 【調試】輸出座位和顏色的匹配結果
-        const roomManager = this.getRoomPlayerManager();
+        //const roomManager = this.getRoomPlayerManager();
         const colorNames = ['Blue', 'Red', 'Green', 'Yellow'];
-        if (roomManager) {
+        if (this._roomPlayerManager) {
             console.log('=== 座位颜色匹配 ===');
             for (let i = 0; i < roomMaxPlayerCount; i++) {
-                const color = roomManager.getSeatColor(i);
+                const color = this._roomPlayerManager.getSeatColor(i);
                 console.log(`  座位${i} = ${colorNames[color]}(${color})`);
             }
         }
@@ -188,8 +287,8 @@ export class LudoGameManager extends Component {
         
         
         // 【調試】輸出該玩家的顏色
-        if (roomManager) {
-            const playerColor = roomManager.getSeatColor(playerType);
+        if (this._roomPlayerManager) {
+            const playerColor = this._roomPlayerManager.getSeatColor(playerType);
             console.log(`本機玩家座位${playerType}的顏色: ${colorNames[playerColor]}(${playerColor})`);
         }
         
@@ -200,8 +299,8 @@ export class LudoGameManager extends Component {
             nickname: 'testPlayer',//-玩家暱稱
             avatarSpriteFrame:null,//-玩家頭像圖片
         }
-        this._factoryManager.addPlayer(playerInfo,playerType);
-
+        //this._factoryManager.addPlayer(playerInfo,playerType);
+        this.addPlayer(playerInfo, playerType);
         await this.createRoomPawns();
 
         // 測試1: 獲取玩家起點並繪製
@@ -362,10 +461,10 @@ export class LudoGameManager extends Component {
     // ========== AniSys API ==========
     public async createRoomPawns(): Promise<void> {
         
-        const roomManager = this.getRoomPlayerManager();
-        if (!roomManager) return;
+        //const roomManager = this.getRoomPlayerManager();
+        if (!this._roomPlayerManager) return;
 
-        const players = roomManager.getAllPlayers();
+        const players = this._roomPlayerManager.getAllPlayers();
         
         for (const player of players) {
             
@@ -395,7 +494,8 @@ export class LudoGameManager extends Component {
                 const node = instantiate(this._testPawn);
                 const pawn = node.getComponent(Pawn);
                 pawn.init(pawnInfo, player.identity.playerColor, i);
-                roomManager.addPawn(player.identity.seatIndex, i, pawn);
+                //this.addPlayer(player.identity, seatIndex);
+                this._roomPlayerManager.addPawn(player.identity.seatIndex, i, pawn);
                 await this._aniSysManager.showPawn(pawn, wpos);
             }
         }
@@ -462,6 +562,14 @@ export class LudoGameManager extends Component {
     /**
      * <移動>
      */
+    public getAreaCenterPosition(localViewIndex: number): Vec3 | null {
+        return this._factoryManager.getAreaCenterPosition(localViewIndex);
+    }
+
+    public getAreaCenterWorldPosition(localViewIndex: number): Vec3 | null {
+        return this._factoryManager.getAreaCenterWorldPosition(localViewIndex);
+    }
+
     public getGridSize(): number | null {
         return this._factoryManager.getBoardGenerator()?.getGridSize() ?? null;
     }
@@ -669,9 +777,10 @@ export class LudoGameManager extends Component {
      * 獲取房間玩家管理器
      * @returns 房間玩家管理器實例，如果未初始化則返回 null
      */
+    /*
     public getRoomPlayerManager() {
         return this._factoryManager.getRoomPlayerManager();
-    }
+    }*/
 
     // ========== 地圖管理 API ==========
     

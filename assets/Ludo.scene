@@ -1616,25 +1616,25 @@
   },
   {
     "__type__": "SeatAreaConfig",
-    "seatIndex": 0,
-    "startRow": 0,
+    "seatIndex": 1,
+    "startRow": 9,
     "startCol": 0,
     "width": 6,
     "height": 6
   },
   {
     "__type__": "SeatAreaConfig",
-    "seatIndex": 0,
-    "startRow": 0,
-    "startCol": 0,
+    "seatIndex": 2,
+    "startRow": 9,
+    "startCol": 9,
     "width": 6,
     "height": 6
   },
   {
     "__type__": "SeatAreaConfig",
-    "seatIndex": 0,
+    "seatIndex": 3,
     "startRow": 0,
-    "startCol": 0,
+    "startCol": 9,
     "width": 6,
     "height": 6
   },
