@@ -1,0 +1,153 @@
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: vs:vert
+      frag: fs:frag
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      rasterizerState:
+        cullMode: none
+      properties:
+        # 必須在 properties 裡顯式定義，TS 才能順利 setProperty
+        center0: { value: [0, 0, 0, 0] }
+        center1: { value: [0, 0, 0, 0] }
+        center2: { value: [0, 0, 0, 0] }
+        center3: { value: [0, 0, 0, 0] }
+        center4: { value: [0, 0, 0, 0] }
+        size0:   { value: [0, 0, 0, 0] }
+        size1:   { value: [0, 0, 0, 0] }
+        size2:   { value: [0, 0, 0, 0] }
+        size3:   { value: [0, 0, 0, 0] }
+        size4:   { value: [0, 0, 0, 0] }
+        texSize: { value: [1080, 1920] }
+        type: { value: 0 }
+        inverted: { value: 0 }
+        scale: { value: 1 }
+        holeCount: { value: 0 }
+        contourTexture: { value: white }
+}%
+
+CCProgram vs %{
+  precision mediump float;
+  #include <cc-global>
+  #if USE_LOCAL
+    #include <builtin/uniforms/cc-local>
+  #endif
+
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec4 spriteColor;
+  out vec2 uv;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1.0);
+    #if USE_LOCAL
+      pos = cc_matWorld * pos;
+    #endif
+    pos = cc_matViewProj * pos;
+    uv = a_texCoord;
+    spriteColor = a_color;
+    return pos;
+  }
+}%
+
+CCProgram fs %{
+  precision mediump float;
+  #include <sprite-texture>
+
+  in vec4 spriteColor;
+  in vec2 uv;
+
+  uniform Fs {
+    vec4 center0; 
+    vec4 center1; 
+    vec4 center2; 
+    vec4 center3; 
+    vec4 center4;
+    vec4 size0;   
+    vec4 size1;   
+    vec4 size2;   
+    vec4 size3;   
+    vec4 size4;
+    vec2 texSize;
+    float type;
+    float inverted;
+    float scale;
+    float holeCount;
+  };
+
+  uniform sampler2D contourTexture;
+
+  vec4 frag () {
+    vec4 o = texture(cc_spriteTexture, uv) * spriteColor;//--取出顏色(未挖洞前的樣子)
+    if (holeCount <= 0.5) return o;//--只處理有洞的情況，沒有洞直接返回原色
+
+    //float finalAlpha = 0.0;
+    /*
+    if (abs(center0.x) > 0.01) {
+        return vec4(0.0, 1.0, 0.0, 1.0); 
+    }*/
+    
+    // 手動平鋪邏輯判斷
+    float isInside = 0.0;
+    vec2 pPos = uv * texSize; // 把 0 ~ 1 的 UV座標映射回具體的像素位置 (左下角為 0,0)-從01的比例轉回像素
+    
+    for (int i = 0; i < 5; i++) {
+        if (float(i) >= holeCount) break;// 只處理有設定的洞
+        
+        vec2 c; vec2 s;
+        if (i == 0)      { c = center0.xy; s = size0.xy; }
+        else if (i == 1) { c = center1.xy; s = size1.xy; }
+        else if (i == 2) { c = center2.xy; s = size2.xy; }
+        else if (i == 3) { c = center3.xy; s = size3.xy; }
+        else             { c = center4.xy; s = size4.xy; }
+
+        // A. 根據索引取出對應的中心點(c)和尺寸(s)
+        // B. 座標轉換 (關鍵公式)
+        vec2 target;
+        target.x = c.x + (texSize.x * 0.5);
+        target.y = (texSize.y * 0.5)-c.y; // 注意 Y 軸反轉
+        vec2 d = abs(pPos - target);// C. 計算距離
+        // D. 判定是否在矩形內
+        if (d.x < s.x * 0.5 && d.y < s.y * 0.5) {
+          isInside = 1.0;// 只要落在任何一個洞內，標記為 1
+        }
+        //vec2 pixelPos = (uv - 0.5) * texSize - c;
+        //vec2 halfSize = s * 0.5;
+        
+        // 矩形判斷
+        //if (abs(pixelPos.x) < halfSize.x && abs(pixelPos.y) < halfSize.y) {
+        //    finalAlpha = 1.0;
+        //}
+    }
+
+    // inverted = 0: 洞內透明 (1-1=0)
+    // inverted = 1: 洞外透明 (1-0=1, 混色後為 1)
+    //o.a *= mix(1.0 - finalAlpha, finalAlpha, inverted);
+    /*
+      mix() 函數：這是一個線性插值函數
+      洞內 (isInside=1) -> mix(0, 1, 0) -> 結果為 0（變透明）
+      洞外 (isInside=0) -> mix(1, 0, 0) -> 結果為 1（不透明）
+      當 inverted = 1 (反向遮罩)
+      洞內 -> 結果為 1（變可見）
+      洞外 -> 結果為 0（變透明）
+      1.取樣：拿到原本黑黑的顏色。
+      2.變換：把目前處理的點轉成像素座標。
+      3.掃描：遍歷所有洞口數據，看看這個點有沒有掉進任何一個洞。
+      4.改色：如果掉進洞裡，就把這個點的 Alpha（透明度） 砍成 0。
+      5.回傳：把處理完的像素顏色交給顯示卡輸出。
+    */
+
+    o.a *= mix(1.0 - isInside, isInside, inverted);
+    //return vec4(target.x / texSize.x, target.y / texSize.y, 0.0, 1.0);
+    return o;
+  }
+}%

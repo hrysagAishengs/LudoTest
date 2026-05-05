@@ -173,7 +173,10 @@ export interface IViewTransformer {
      * 示例：藍色玩家從起點 [1,6] 移動 5 步 -> [6,6]
      */
     // === InView path query APIs ===
-
+    //--20260505 NEW: 根據路徑索引直接取得畫面座標
+    getPathCoordInViewByPathIndex(chairId: number, pathIndex: number): [number, number] | null;
+    //--20260505 NEW: 根據起點索引和步數直接取得路徑段的畫面座標列表
+    getPathSegmentInViewByPathIndex(chairId: number, startPathIndex: number, endPathIndex: number): [number, number][] | null;
     /**
      * Gets the visual board coordinate for a player's path index in the current view.
      * chairId is the real seat/player index.

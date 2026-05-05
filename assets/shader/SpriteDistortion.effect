@@ -1,0 +1,115 @@
+// Copyright (c) 2017-2020 Xiamen Yaji Software Co., Ltd.
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+          blendDstAlpha: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      properties:
+        alphaThreshold: { value: 0.5 }
+        # 貼圖參數要放前面
+        distort_texture: {}
+        mask_texture: {}
+        # vec, float系列要使用Uniform Const包起來
+        main_offset: { value: [0.0, 0.0], editor: {type: vec2} }
+        distort_offset: { value: [0.0, 0.0], editor: {type: vec2} }
+        distort_intensity: { value: 0.1 }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #if USE_LOCAL
+    #include <builtin/uniforms/cc-local>
+  #endif
+  #if SAMPLE_FROM_RT
+    #include <common/common-define>
+  #endif
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec4 color;
+  out vec2 uv0;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+
+    #if USE_LOCAL
+      pos = cc_matWorld * pos;
+    #endif
+
+    #if USE_PIXEL_ALIGNMENT
+      pos = cc_matView * pos;
+      pos.xyz = floor(pos.xyz);
+      pos = cc_matProj * pos;
+    #else
+      pos = cc_matViewProj * pos;
+    #endif
+
+    uv0 = a_texCoord;
+    #if SAMPLE_FROM_RT
+      CC_HANDLE_RT_SAMPLE_FLIP(uv0);
+    #endif
+    color = a_color;
+
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+    precision highp float;
+    #include <builtin/internal/embedded-alpha>
+    #include <builtin/internal/alpha-test>
+
+    in vec4 color;
+    in vec2 uv0;
+
+    //貼圖可以單獨放
+    uniform sampler2D distort_texture;
+
+    #if USE_MASK
+      uniform sampler2D mask_texture;
+    #endif
+
+    //對外參數一定要放在uniform Constant內
+    uniform Constant{
+      vec2 main_offset;
+      vec2 distort_offset;
+      float distort_intensity;
+    };
+
+    //用到內建的變數，查找internal/chunks/builtin/internal/sprite-texture.chunk
+    //ios平台使用Metal一定要指定layout，否則cc_spriteTexture無法binding
+    //web or Android可以不用指定layout
+    #pragma builtin(local)
+    layout(set = 2, binding = 12) uniform sampler2D cc_spriteTexture;
+
+    vec4 frag () {
+        vec4 distortTexColor = CCSampleWithAlphaSeparated(distort_texture, uv0 + vec2(-distort_offset.x, distort_offset.y));
+
+        #if USE_MASK
+            vec2 distort = distortTexColor.rg * CCSampleWithAlphaSeparated(mask_texture, uv0).r;
+        #else
+            vec2 distort = distortTexColor.rg;
+        #endif
+
+        vec4 o = CCSampleWithAlphaSeparated(cc_spriteTexture, uv0 + vec2(-main_offset.x, main_offset.y) + distort*distort_intensity);
+       
+        ALPHA_TEST(o);
+
+        o *= color;
+
+        return o;
+    }
+}%

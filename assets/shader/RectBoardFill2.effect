@@ -1,0 +1,152 @@
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: sprite-vs:virt
+      frag: sprite-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+          blendDstAlpha: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      properties:
+        borderColor: { value: [0.0, 1.0, 0.0, 1.0], editor: { type: color } }
+        spriteInfo: { value: [100.0, 100.0, 0.5, 0.5] }
+        uvRect: { value: [0.0, 0.0, 1.0, 1.0] }
+        alphaThreshold: { value: 0.5 }
+        progress: { value: 1.0, editor: { slide: true, range: [0, 1.0], step: 0.01 } }
+        thickness: { value: 0.1, editor: { slide: true, range: [0, 0.5], step: 0.01 } }
+        direction: { value: 0.0, editor: { slide: true, range: [0, 1.0], step: 1.0 } }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #if USE_LOCAL
+    #include <builtin/uniforms/cc-local>
+  #endif
+  #if SAMPLE_FROM_RT
+    #include <common/common-define>
+  #endif
+
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec2 v_uv0;
+  out vec2 v_localPos;
+  out vec4 v_color;
+
+  vec4 virt () {
+    vec4 pos = vec4(a_position, 1);
+
+    #if USE_LOCAL
+      pos = cc_matWorld * pos;
+    #endif
+
+    #if USE_PIXEL_ALIGNMENT
+      pos = cc_matView * pos;
+      pos.xyz = floor(pos.xyz);
+      pos = cc_matProj * pos;
+    #else
+      pos = cc_matViewProj * pos;
+    #endif
+
+    v_uv0 = a_texCoord;
+    v_localPos = a_position.xy;
+    #if SAMPLE_FROM_RT
+      CC_HANDLE_RT_SAMPLE_FLIP(v_uv0);
+    #endif
+    v_color = a_color;
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+  precision highp float;
+  #include <builtin/internal/embedded-alpha>
+  #include <builtin/internal/alpha-test>
+
+  in vec2 v_uv0;
+  in vec2 v_localPos;
+  in vec4 v_color;
+
+  uniform Constant {
+    vec4 borderColor;
+    vec4 spriteInfo;
+    vec4 uvRect;
+    float progress;
+    float thickness;
+    float direction;
+  };
+
+  #pragma builtin(local)
+  layout(set = 2, binding = 12) uniform sampler2D cc_spriteTexture;
+
+  vec4 frag () {
+    // 除錯用：觀察 atlas / SpriteFrame 的 UV 範圍。
+    // return vec4(v_uv0.x * 10.0, v_uv0.y * 10.0, 0.0, 1.0);
+
+    /*
+    舊版：直接使用 v_uv0 當作邊框 UV。
+    如果 SpriteFrame 來自 atlas 或有裁切，v_uv0 不一定是 Sprite 自己的 0~1。
+    vec2 uv = v_uv0;
+    */
+
+    /*
+    // 另一種嘗試：用 Sprite local position、尺寸與 anchor 換算 Sprite 自己的 0~1 UV。
+    vec2 spriteSize = max(spriteInfo.xy, vec2(0.0001, 0.0001));
+    vec2 spriteAnchor = spriteInfo.zw;
+    vec2 uv = (v_localPos + spriteSize * spriteAnchor) / spriteSize;
+    uv = clamp(uv, 0.0, 1.0);
+    */
+
+    // 目前使用的版本：
+    // v_uv0 是真正用來取樣貼圖 / atlas 的 UV。
+    // uvRect 由 TS 根據 SpriteFrame.uv 算出：[minU, minV, width, height]。
+    // 用 uvRect 將 v_uv0 正規化成 Sprite 自己的 0~1 UV，專門拿來判斷邊框。
+    vec2 uvSize = max(uvRect.zw, vec2(0.0001, 0.0001));
+    vec2 uv = (v_uv0 - uvRect.xy) / uvSize;
+    uv = clamp(uv, 0.0, 1.0);
+
+    // 取樣原圖仍然使用 v_uv0，因為圖片可能來自 atlas。
+    vec4 o = CCSampleWithAlphaSeparated(cc_spriteTexture, v_uv0) * v_color;
+
+    // 邊框判斷使用 Sprite 自己的 UV，所以 thickness 會相對於這個 Sprite 的矩形。
+    bool inBorder = (
+      uv.x < thickness ||
+      uv.x > 1.0 - thickness ||
+      uv.y < thickness ||
+      uv.y > 1.0 - thickness
+    );
+
+    // 將四個邊框邊緣轉成一條連續的 0~1 路徑。
+    float currentPath = 0.0;
+    if (uv.y <= thickness) {
+      currentPath = uv.x * 0.25;
+    } else if (uv.x >= 1.0 - thickness) {
+      currentPath = 0.25 + uv.y * 0.25;
+    } else if (uv.y >= 1.0 - thickness) {
+      currentPath = 0.5 + (1.0 - uv.x) * 0.25;
+    } else if (uv.x <= thickness) {
+      currentPath = 0.75 + (1.0 - uv.y) * 0.25;
+    }
+
+    // direction: 0 = 原方向，1 = 反方向。
+    if (direction > 0.5) {
+      currentPath = 1.0 - currentPath;
+    }
+
+    if (inBorder && currentPath <= progress) {
+      o = vec4(borderColor.rgb, o.a * borderColor.a);
+    }
+
+    ALPHA_TEST(o);
+    return o;
+  }
+}%

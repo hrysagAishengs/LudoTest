@@ -496,7 +496,7 @@ export class LudoGameManager extends Component {
                 pawn.init(pawnInfo, player.identity.playerColor, i);
                 //this.addPlayer(player.identity, seatIndex);
                 this._roomPlayerManager.addPawn(player.identity.seatIndex, i, pawn);
-                await this._aniSysManager.showPawn(pawn, wpos);
+                //await this._aniSysManager.showPawn(pawn, wpos);
             }
         }
     }    

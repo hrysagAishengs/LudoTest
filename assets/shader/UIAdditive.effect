@@ -1,0 +1,159 @@
+// Copyright (c) 2017-2020 Xiamen Yaji Software Co., Ltd.
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: ui-vs:vert
+      frag: ui-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+          blendDstAlpha: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      properties:
+        alphaThreshold: { value: 0.5 }
+        # 貼圖參數要放前面
+        add_texture: {}
+        # vec, float系列要使用Uniform Const包起來
+        add_color: { value: [1.0, 1.0, 1.0, 0.0], editor: {type: color} }
+        main_offset: { value: [0.0, 0.0], editor: {type: vec2} }
+        add_offset: { value: [0.0, 0.0], editor: {type: vec2} }
+        add_scale: { value: [1.0, 1.0], editor: {type: vec2}}
+        add_rotate: { value: [0.0], editor: {type: number}}
+}%
+
+CCProgram ui-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #if USE_LOCAL
+    #include <builtin/uniforms/cc-local>
+  #endif
+  #if SAMPLE_FROM_RT
+    #include <common/common-define>
+  #endif
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  //additive是否使用uv1
+  #if USE_UV1
+    //特殊命名，一定要a_texCoord2
+    in vec2 a_texCoord2;
+  #endif
+
+  out vec4 color;
+  out vec2 uv0;
+  #if USE_UV1
+    out vec2 uv1;
+  #endif
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+
+    #if USE_LOCAL
+      pos = cc_matWorld * pos;
+    #endif
+
+    #if USE_PIXEL_ALIGNMENT
+      pos = cc_matView * pos;
+      pos.xyz = floor(pos.xyz);
+      pos = cc_matProj * pos;
+    #else
+      pos = cc_matViewProj * pos;
+    #endif
+
+    uv0 = a_texCoord;
+    #if USE_UV1
+      uv1 = a_texCoord2;
+    #endif
+    #if SAMPLE_FROM_RT
+      CC_HANDLE_RT_SAMPLE_FLIP(uv0);
+      #if USE_UV1
+        CC_HANDLE_RT_SAMPLE_FLIP(uv1);
+      #endif
+    #endif
+    color = a_color;
+
+    return pos;
+  }
+}%
+
+CCProgram ui-fs %{
+    precision highp float;
+    #include <builtin/internal/embedded-alpha>
+    #include <builtin/internal/alpha-test>
+
+    in vec4 color;
+    in vec2 uv0;
+    #if USE_UV1
+      in vec2 uv1;
+    #endif
+    
+    const vec2 center = vec2(0.5, 0.5);
+
+    uniform Main{
+      vec2 main_offset;
+    };
+
+  #if ADDITIVE
+    //貼圖可以單獨放
+    uniform sampler2D add_texture;
+
+    //對外參數一定要放在uniform內
+    uniform Constant{
+      vec4 add_color;
+      vec2 add_offset;
+      vec2 add_scale;
+      float add_rotate;
+    };
+  #endif
+
+    //用到內建的變數，查找internal/chunks/builtin/internal/sprite-texture.chunk
+    //ios平台使用Metal一定要指定layout，否則cc_spriteTexture無法binding
+    //web or Android可以不用指定layout
+    #pragma builtin(local)
+    layout(set = 2, binding = 12) uniform sampler2D cc_spriteTexture;
+
+    vec4 frag () {
+        vec2 uv = uv0;
+        #if USE_UV1
+          uv = uv1;
+        #endif
+        //maintexture must support repeat uv for the flow effect
+        vec4 o = CCSampleWithAlphaSeparated(cc_spriteTexture, fract(uv0 + vec2(-main_offset.x, main_offset.y)));
+       
+        ALPHA_TEST(o);
+
+        float y_flip = 1.0;
+        #if OFFSET_Y_FLIP
+            y_flip = -1.0;
+        #endif
+        //計算加色
+        #if ADDITIVE
+            //additive texture scale 功能，先做offset運算，再scale
+            vec2 offset = (uv + vec2(-add_offset.x, add_offset.y * y_flip) - center)/add_scale + center;
+
+            // Calculate the rotation matrix for the Z-axis rotation (2D rotation)
+            float angle = radians(add_rotate); // Rotation angle in radians
+            mat2 rotationMatrix = mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
+
+            // Compute the rotated offset (apply rotation in 2D)
+            vec2 rotatedOffset = rotationMatrix * (offset - center) + center;
+
+            vec4 additiveColor = CCSampleWithAlphaSeparated(add_texture, rotatedOffset);
+            o.rgb += additiveColor.rgb * additiveColor.a * add_color.rgb * add_color.a;
+        #endif
+
+        #if IS_GRAY
+            float gray  = 0.2126 * o.r + 0.7152 * o.g + 0.0722 * o.b;
+            o.r = o.g = o.b = gray;
+        #endif
+
+        return o;
+    }
+}%

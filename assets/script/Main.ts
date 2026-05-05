@@ -2,6 +2,8 @@ import { _decorator, Component, Node } from 'cc';
 import { LudoGameManager } from './LudoGameManager';
 import { LudoGameMode } from './gameDef/GameDef';
 import { IRollData, SimpleSlot } from './simpleSlot/SimpleSlot';
+import { TestShader } from '../shader/testShaderComp/TestShader';
+import { TestShader_OG } from '../shader/testShaderComp/TestShader_OG';
 //import { BasicBoardGenerator } from './map/board/factory/board/BasicBoardGenerator';
 
 
@@ -15,6 +17,13 @@ export class Main extends Component {
 
     @property({type:SimpleSlot,displayName:"測試用節點",tooltip:"用於測試的節點",visible:true})
     private _testSlotNode: SimpleSlot = null!;
+
+    @property({type:TestShader,displayName:"測試用Shader",tooltip:"用於測試的Shader組件",visible:true})
+    private _testShader: TestShader = null!;
+
+    @property({type:TestShader_OG,displayName:"測試用Shader",tooltip:"用於測試的Shader組件",visible:true})
+    private _testShader_OG: TestShader_OG = null!;
+
     start() {
         
         this.initGame();
@@ -22,7 +31,9 @@ export class Main extends Component {
 
     public async testBtn():Promise<void>{
         // 測試按鈕觸發的邏輯
-        
+        //this._testShader.playProgressTween(1, 0, 1);//無->有
+        this._testShader_OG.playProgressTween(1, 1, 0);//-有->無
+        /*
         const myData: IRollData[] = [
             { symbolId: 0 }, 
             { symbolId: 2 } // 最後一筆是結果
@@ -36,7 +47,7 @@ export class Main extends Component {
         await this._testSlotNode.startRoll(myData);
         const endTime = Date.now();
         console.log(`滾動結束，顯示結果！耗時: ${(endTime - startTime) / 1000} 秒`);
-        
+        */
        // 1. 先讓它開始轉
        /* 
        this._testSlotNode.startRoll(); 

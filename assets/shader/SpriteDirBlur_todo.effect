@@ -1,0 +1,115 @@
+// Copyright (c) 2017-2020 Xiamen Yaji Software Co., Ltd.
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: src_alpha
+          blendDst: one_minus_src_alpha
+          blendDstAlpha: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      properties:
+        alphaThreshold: { value: 0.5 }
+        resolution: { value: [100.0, 100.0], editor: {type: vec2} }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #if USE_LOCAL
+    #include <builtin/uniforms/cc-local>
+  #endif
+  #if SAMPLE_FROM_RT
+    #include <common/common-define>
+  #endif
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec4 color;
+  out vec2 uv0;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1);
+
+    #if USE_LOCAL
+      pos = cc_matWorld * pos;
+    #endif
+
+    #if USE_PIXEL_ALIGNMENT
+      pos = cc_matView * pos;
+      pos.xyz = floor(pos.xyz);
+      pos = cc_matProj * pos;
+    #else
+      pos = cc_matViewProj * pos;
+    #endif
+
+    uv0 = a_texCoord;
+    #if SAMPLE_FROM_RT
+      CC_HANDLE_RT_SAMPLE_FLIP(uv0);
+    #endif
+    color = a_color;
+
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+    precision highp float;
+    #include <builtin/internal/embedded-alpha>
+    #include <builtin/internal/alpha-test>
+
+    in vec4 color;
+    in vec2 uv0;
+
+    //對外參數一定要放在uniform Constant內
+    uniform Constant{
+      vec2 resolution;
+    };
+
+    //用到內建的變數，查找internal/chunks/builtin/internal/sprite-texture.chunk
+    //ios平台使用Metal一定要指定layout，否則cc_spriteTexture無法binding
+    //web or Android可以不用指定layout
+    #pragma builtin(local)
+    layout(set = 2, binding = 12) uniform sampler2D cc_spriteTexture;
+
+    vec4 frag () {
+        float _Sigma = 1.5;
+        const int _Ratio = 2;
+        float sum = 0.0;
+        vec4 o = vec4(0.0, 0.0, 0.0, 0.0);
+
+        vec2 texel = vec2(1.0/resolution.x, 1.0/resolution.y);
+
+        for(int i = -_Ratio; i <= _Ratio; ++i)
+        {
+            //for(int j = -_Ratio; j <= _Ratio; ++j)
+            {
+              int j = 0;
+                vec2 offset = vec2(i,j)*_Sigma*texel;
+                vec2 uv = uv0 + offset;
+                if(uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0)
+                {
+                    float weight = exp((offset.x*offset.x + offset.y*offset.y)/(-2.0*_Sigma*_Sigma))/(6.2831852 * _Sigma * _Sigma);
+                    o += CCSampleWithAlphaSeparated(cc_spriteTexture, uv) * weight;
+                    sum += weight;
+                }
+            }
+        }
+
+        o/=sum;
+
+        ALPHA_TEST(o);
+
+        o *= color;
+
+        return o;
+    }
+}%

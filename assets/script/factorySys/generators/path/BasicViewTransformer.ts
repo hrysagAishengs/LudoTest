@@ -201,7 +201,23 @@ export class BasicViewTransformer implements IViewTransformer {
         return [r, c];
     }
 
-    
+    /**
+     * 20260505 NEW: 根據路徑索引直接取得畫面座標
+     * @param chairId Table idx座位id
+     * @param pathIndex 路徑索引（在該玩家路徑陣列中的索引位置）
+     * @returns 畫面座標 [row, col]，如果無法取得返回 null
+     */
+    public getPathCoordInViewByPathIndex(chairId: number, pathIndex: number): [number, number] | null {
+        
+        if (!this._originalPathMap) return null;
+
+        const localViewIndex = this.getLocalViewIndex(chairId);
+        const visualPath = this._originalPathMap[localViewIndex];
+
+        const coord = visualPath?.[pathIndex];
+        return coord ? [coord[0], coord[1]] : null;
+    }
+
     /**
      * 取得路徑索引後轉為畫面座標
      * @param chairId Table idx座位id
@@ -211,7 +227,8 @@ export class BasicViewTransformer implements IViewTransformer {
      */
     public getPathCoordInViewByStartIndex(chairId:number,startIndex: number, steps: number): [number, number] | null {
         
-        
+        return this.getPathCoordInViewByPathIndex(chairId, startIndex + steps);
+        /*
         const currentPath = this._originalPathMap?.[chairId];//--這個只是要去取出路徑原始資料來測試
         const endIndex = startIndex + steps;
         const baseEndPos = currentPath[endIndex];//--測試用
@@ -219,7 +236,7 @@ export class BasicViewTransformer implements IViewTransformer {
         const viewIndex = this.getLocalViewIndex(chairId);
         const visualPath = this._originalPathMap[viewIndex];
         const visualCoord = visualPath[endIndex];
-
+        */
         /*
         const currentPath = this._pathMap?.[chairId];
         const endIndex = startIndex + steps;
@@ -234,7 +251,7 @@ export class BasicViewTransformer implements IViewTransformer {
         const visualCoord = visualPath[endIndex];
         */
         
-        return visualCoord ? [visualCoord[0], visualCoord[1]] : null;
+        //return visualCoord ? [visualCoord[0], visualCoord[1]] : null;
 
     }
 
@@ -274,9 +291,44 @@ export class BasicViewTransformer implements IViewTransformer {
         return this.getPathSegmentInViewByStartIndex(chairId, startIndex, steps);
     }
 
+    /**
+     * 20260505 NEW: 根據起點和終點索引直接取得路徑段的畫面座標列表
+     * @param chairId Table idx座位id
+     * @param startPathIndex 起點索引（在該玩家路徑陣列中的索引位置）
+     * @param endPathIndex 終點索引（在該玩家路徑陣列中的索引位置）
+     * @returns 路徑段的畫面座標列表，如果無法取得返回 null
+     */
+    public getPathSegmentInViewByPathIndex(chairId: number, startPathIndex: number, endPathIndex: number): [number, number][] | null {
+        //const endIndex = startIndex + steps;
+        //const currentPath = this._originalPathMap?.[chairId];//--這個只是要去取出路徑原始資料來測試
+        //const baseEndPos = currentPath[endIndex];//--測試用
+        if (!this._originalPathMap) return null;
+        const viewIndex = this.getLocalViewIndex(chairId);
+        const visualPath = this._originalPathMap[viewIndex];
+        if (!visualPath) return null;
+        const visualSegment: [number, number][] = [];
+        for(let i=startPathIndex;i<=endPathIndex;i++){
+            const visualCoord = visualPath[i];
+            if(visualCoord) {
+                visualSegment.push([visualCoord[0], visualCoord[1]]);
+            }
+        }
+        return visualSegment.length > 0 ? visualSegment : null;
+    
+    }
+
+    /**
+     * 20260505 NEW: 根據起點索引和步數直接取得路徑段的畫面座標列表
+     * @param chairId Table idx座位id
+     * @param startIndex 起點索引（在該玩家路徑陣列中的索引位置）
+     * @param steps 移動步數
+     * @returns 路徑段的畫面座標列表，如果無法取得返回 null
+     */
     public getPathSegmentInViewByStartIndex(chairId: number, startIndex: number, steps: number): [number, number][] | null {
         
         const endIndex = startIndex + steps;
+        return this.getPathSegmentInViewByPathIndex(chairId, startIndex, endIndex);
+        /*
         const currentPath = this._originalPathMap?.[chairId];//--這個只是要去取出路徑原始資料來測試
         const baseEndPos = currentPath[endIndex];//--測試用
         const viewIndex = this.getLocalViewIndex(chairId);
@@ -289,6 +341,7 @@ export class BasicViewTransformer implements IViewTransformer {
             }
         }
         return visualSegment.length > 0 ? visualSegment : null;
+        */
     }
 
     
@@ -362,11 +415,6 @@ export class BasicViewTransformer implements IViewTransformer {
     }
 
     
-   
-
-
-
-   
 
     public getSeatBaseSlotInView(playerView: number, slotIndex: number):[number,number] | null {
         
