@@ -326,31 +326,71 @@ export class GameMapCenter {
      * @param c 列索引（基本盤坐標）
      * @param marker 標記
      */
-    public addMarker(r: number, c: number, marker: IMarker): void {
+    public addMarker(baseR: number, baseC: number, marker: IMarker, visualR: number = baseR, visualC: number = baseC): void {
         if (!this._config.enableMarkers) return;
         
-        const grid = this.getGridAt(r, c);
-        if (grid) {
+        const dataGrid = this.getGridAt(baseR, baseC);
+        const visualGrid = this.getGridAt(visualR, visualC);
+        if (dataGrid) {
             // 設置數據坐標和初始視覺坐標
-            marker.dataCoord = [r, c];
-            marker.visualCoord = [r, c];
+            marker.dataCoord = [baseR, baseC];
+            marker.visualCoord = [visualR, visualC];
             
-            grid.markers.push(marker);
-            grid.isSpecial = true;
+            dataGrid.markers.push(marker);
+            dataGrid.isSpecial = true;
             
-            // 添加到玩家索引緩存 ⭐
+            // 添加到玩家索引緩存
             if (marker.playerIndex !== undefined) {
                 if (!this._markersByPlayer.has(marker.playerIndex)) {
                     this._markersByPlayer.set(marker.playerIndex, []);
                 }
                 this._markersByPlayer.get(marker.playerIndex)!.push(marker);
             }
-            
+
             // 如果有圖標，添加到節點上
             if (marker.icon) {
-                marker.icon.parent = grid.containerNode;
+                marker.icon.parent = (visualGrid ?? dataGrid).containerNode;
             }
         }
+    }
+
+    /**
+     * Debug 用：掃描整張基本盤資料，列出有特殊資料的格子。
+     */
+    public logSpecialGridData(): void {
+        console.log('[GameMapCenter] ===== 特殊格資料檢查開始 =====');
+
+        let count = 0;
+        for (let r = 0; r < this._gridSize; r++) {
+            for (let c = 0; c < this._gridSize; c++) {
+                const grid = this._gridData[r]?.[c];
+                if (!grid) {
+                    continue;
+                }
+
+                const hasMarkers = grid.markers.length > 0;
+                const hasSpecialState = grid.state !== GridState.EMPTY;
+                const isSpecial = grid.isSpecial;
+
+                if (!hasMarkers && !hasSpecialState && !isSpecial) {
+                    continue;
+                }
+
+                count++;
+                console.log(`[GameMapCenter] special grid [${r}, ${c}] state=${GridState[grid.state]} isSpecial=${grid.isSpecial} markers=${grid.markers.length}`);
+
+                for (let i = 0; i < grid.markers.length; i++) {
+                    const marker = grid.markers[i];
+                    console.log(
+                        `[GameMapCenter]   marker#${i} type=${MarkerType[marker.type]} dataCoord=${JSON.stringify(marker.dataCoord)} visualCoord=${JSON.stringify(marker.visualCoord)} playerIndex=${marker.playerIndex} hasIcon=${!!marker.icon}`,
+                        marker.data
+                    );
+
+                }
+            }
+        }
+
+        console.log(`[GameMapCenter] ===== 特殊格資料檢查完成，共 ${count} 格 =====`);
     }
     
     /**
@@ -559,69 +599,6 @@ export class GameMapCenter {
     }
     
     // ========== 視角旋轉功能 ==========
-    
-    /**
-     * 旋轉所有標記圖標的視覺位置（數據層不變）
-     * 
-     * 工作原理：
-     * - markers 數據仍保存在基本盤座標 [r, c] 的格子中
-     * - 只移動 marker.icon 節點的父節點到新視角下的格子
-     * - playerIndex = 0 時視覺位置與基本盤一致，無需移動
-     * 
-     * @param playerIndex 當前玩家索引 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @param viewTransformer 視角轉換器
-     */
-    public rotateMarkersView(playerIndex: number, viewTransformer: IViewTransformer): void {
-        // playerIndex = 0 時，視覺位置 = 基本盤位置，不需要移動
-        if (playerIndex === 0) {
-            console.log('[GameMapCenter] playerIndex=0，標記位置無需調整');
-            return;
-        }
-        
-        console.log(`[GameMapCenter] 開始旋轉標記到玩家 ${playerIndex} 視角...`);
-        
-        // 遍歷所有格子，找出有 markers 的格子
-        for (let r = 0; r < this._gridSize; r++) {
-            for (let c = 0; c < this._gridSize; c++) {
-                const grid = this._gridData[r][c];
-                
-                // 跳過沒有 markers 的格子
-                if (!grid || grid.markers.length === 0) {
-                    continue;
-                }
-                
-                // 計算該格子在新視角下的位置
-                const [newR, newC] = viewTransformer.baseToPlayerView(r, c, playerIndex);
-                
-                // 獲取目標格子
-                const targetGrid = this._gridData[newR]?.[newC];
-                if (!targetGrid) {
-                    console.warn(`[GameMapCenter] 目標格子 [${newR}, ${newC}] 不存在`);
-                    continue;
-                }
-                
-                // 移動所有 marker 的 icon 到新格子
-                for (const marker of grid.markers) {
-                    if (marker.icon) {
-                        // 將 icon 的父節點改為目標格子的 containerNode
-                        marker.icon.parent = targetGrid.containerNode;
-                        
-                        // 更新視覺坐標
-                        marker.visualCoord = [newR, newC];
-                        
-                        // 標記所屬玩家信息
-                        const playerNames = ['Blue', 'Red', 'Green', 'Yellow'];
-                        const ownerPlayer = marker.playerIndex;
-                        const ownerInfo = ownerPlayer !== undefined ? ` (玩家: ${playerNames[ownerPlayer]})` : '';
-                        
-                        console.log(`[GameMapCenter] 移動標記 icon (type: ${MarkerType[marker.type]}${ownerInfo}) 從 [${r},${c}] 到 [${newR},${newC}]`);
-                    }
-                }
-            }
-        }
-        
-        console.log('[GameMapCenter] 標記旋轉完成');
-    }
     
     /**
      * 重置所有標記圖標到基本盤位置
@@ -1004,4 +981,73 @@ export class GameMapCenter {
         const [dataR, dataC] = viewTransformer.playerViewToBase(r, c, playerType);
         return this.getNodeAt(dataR, dataC);
     }
+
+    // ========== 即將刪除區域：舊標記視覺旋轉流程 ==========
+
+    /**
+     * 旋轉所有標記圖標的視覺位置（數據層不變）
+     *
+     * @deprecated old flow，即將刪除。新流程由 GameMapDecorator.renderDecorationView 依目前玩家視角建立裝飾視覺節點。
+     *
+     * 工作原理：
+     * - markers 數據仍保存在基本盤座標 [r, c] 的格子中
+     * - 只移動 marker.icon 節點的父節點到新視角下的格子
+     * - playerIndex = 0 時視覺位置與基本盤一致，無需移動
+     *
+     * @param playerIndex 當前玩家索引 (0:Blue, 1:Red, 2:Green, 3:Yellow)
+     * @param viewTransformer 視角轉換器
+     */
+    public rotateMarkersView(playerIndex: number, viewTransformer: IViewTransformer): void {
+        // playerIndex = 0 時，視覺位置 = 基本盤位置，不需要移動
+        if (playerIndex === 0) {
+            console.log('[GameMapCenter] playerIndex=0，標記位置無需調整');
+            return;
+        }
+
+        console.log(`[GameMapCenter] 開始旋轉標記到玩家 ${playerIndex} 視角...`);
+
+        // 遍歷所有格子，找出有 markers 的格子
+        for (let r = 0; r < this._gridSize; r++) {
+            for (let c = 0; c < this._gridSize; c++) {
+                const grid = this._gridData[r][c];
+
+                // 跳過沒有 markers 的格子
+                if (!grid || grid.markers.length === 0) {
+                    continue;
+                }
+
+                // 計算該格子在新視角下的位置
+                const [newR, newC] = viewTransformer.baseToPlayerView(r, c, playerIndex);
+
+                // 獲取目標格子
+                const targetGrid = this._gridData[newR]?.[newC];
+                if (!targetGrid) {
+                    console.warn(`[GameMapCenter] 目標格子 [${newR}, ${newC}] 不存在`);
+                    continue;
+                }
+
+                // 移動所有 marker 的 icon 到新格子
+                for (const marker of grid.markers) {
+                    if (marker.icon) {
+                        // 將 icon 的父節點改為目標格子的 containerNode
+                        marker.icon.parent = targetGrid.containerNode;
+
+                        // 更新視覺坐標
+                        marker.visualCoord = [newR, newC];
+
+                        // 標記所屬玩家信息
+                        const playerNames = ['Blue', 'Red', 'Green', 'Yellow'];
+                        const ownerPlayer = marker.playerIndex;
+                        const ownerInfo = ownerPlayer !== undefined ? ` (玩家: ${playerNames[ownerPlayer]})` : '';
+
+                        console.log(`[GameMapCenter] 移動標記 icon (type: ${MarkerType[marker.type]}${ownerInfo}) 從 [${r},${c}] 到 [${newR},${newC}]`);
+                    }
+                }
+            }
+        }
+
+        console.log('[GameMapCenter] 標記旋轉完成');
+    }
+
+    // ========== 即將刪除區域結束：舊標記視覺旋轉流程 ==========
 }

@@ -283,7 +283,7 @@ export class LudoGameManager extends Component {
             }
         }
         
-        const playerType = 2;
+        const playerType = 3;
         
         
         // 【調試】輸出該玩家的顏色
@@ -313,7 +313,7 @@ export class LudoGameManager extends Component {
         // 測試5: 測試 getOtherPlayerDestToGlobal（其他玩家的路徑）
         console.log('\n=== 測試 getOtherPlayerDestToGlobal ===');
         // otherPlayer=1 表示左上角的玩家（相對於當前視角）
-        const path_testOtherPlayerChairId=3;
+        const path_testOtherPlayerChairId=2;
         const otherPlayerDes = this.getPathCoordInViewByStartIndex(path_testOtherPlayerChairId, 0, 1);
         if (otherPlayerDes) {
             const drawOtherPos = this.getCellPosition(otherPlayerDes[0], otherPlayerDes[1]);
@@ -327,7 +327,7 @@ export class LudoGameManager extends Component {
         const testttt=this._factoryManager.getViewTransformer().getSeatBaseSlotInView(playerType, 0);
         
         // 測試2: 使用新的座位感知方法獲取第1個坑位
-        const slotIndex=3;
+        const slotIndex=0;
         const slotData = this.getPlayerBaseBySlotIndex(playerType, slotIndex);  // 座位playerType的第1個坑位
         if (slotData) {
             const slotPos = this.getBaseSlotPosition(slotData[0], slotData[1]);

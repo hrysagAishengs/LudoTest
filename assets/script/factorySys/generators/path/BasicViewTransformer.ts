@@ -16,17 +16,15 @@ export class BasicViewTransformer implements IViewTransformer {
     private _originalPathMap: Record<number, number[][]> | null = null;  // 存儲原始路徑（未重映射）
     //private _originalPathMapOld: Record<number, number[][]> | null = null;  //  存儲舊的原始路徑（未重映射）
     private _baseMap: Record<number, number[][]> | null = null;
-    private _originalBaseMap: Record<number, number[][]> | null = null;  // 🆕 存儲原始基地（未重映射）
-    private _slotIdMap: Record<number, number[]> | null = null;  // 🆕 存儲每個玩家的 SlotID 陣列
+    private _originalBaseMap: Record<number, number[][]> | null = null;  // 存儲原始基地（未重映射）
+    private _slotIdMap: Record<number, number[]> | null = null;  // 存儲每個玩家的 SlotID 陣列
     
     // 基地坑位 Slot ID 配置
     private _baseSlotIdOffset: number = -1;  // 坑位 ID 起始值（預設 -1）
     private _slotsPerPlayer: number = 4;      // 每個玩家的坑位數量（預設 4）
     
-    // 雙重旋轉系統追蹤
-    private _baseColorRotation: number = 0;   // 基本盤顏色旋轉索引（第一次旋轉）
-    private _totalRotationSteps: number = 0;  // 當前實際的總旋轉次數（0-3，用於 setupLocalPlayerView）
-
+    //--new
+    private _dataRotationSteps :number=0;//數據旋轉次數（0-3，用於根據玩家視角轉換路徑和基地座標）
     private _currentPlayerView:number=-1;// 當前玩家座位（座位索引，0-3），由 setupLocalPlayerView 设置，用于路径转换方法中正确处理旋转
     /**
      * 設置路徑內容
@@ -35,8 +33,7 @@ export class BasicViewTransformer implements IViewTransformer {
     public setPathContent(pathMap: Record<number, number[][]>): void {
         this._pathMap = pathMap;
        
-        // 【调试】输出设置后的路径数据
-        console.log('[BasicViewTransformer.setPathContent] 路径数据已更新：',this._pathMap);
+        console.log('[BasicViewTransformer.setPathContent] _pathMap已更新：',this._pathMap);
         
     }
 
@@ -46,14 +43,9 @@ export class BasicViewTransformer implements IViewTransformer {
      */
     public setOriginalPathContent(originalPathMap: Record<number, number[][]>): void {
         this._originalPathMap = originalPathMap;
-        console.log('[BasicViewTransformer.setOriginalPathContent] 原始路径数据已设置');
+        console.log('[BasicViewTransformer.setOriginalPathContent] _originalPathMap已更新：',this._originalPathMap);
     }
 
-    /*
-    public setOriginalPathContentOld(originalPathMap: Record<number, number[][]>): void {
-        this._originalPathMapOld = originalPathMap;
-        console.log('[BasicViewTransformer.setOriginalPathContentOld] 原始路径数据已设置');
-    }*/
 
     /**
      *  設置原始基地內容（未重映射的標準基地）
@@ -61,7 +53,7 @@ export class BasicViewTransformer implements IViewTransformer {
      */
     public setOriginalBaseContent(originalBaseMap: Record<number, number[][]>): void {
         this._originalBaseMap = originalBaseMap;
-        console.log('[BasicViewTransformer.setOriginalBaseContent] 原始基地数据已设置');
+        console.log('[BasicViewTransformer.setOriginalBaseContent] _originalBaseMap已更新：',this._originalBaseMap);
     }
 
     /**
@@ -70,6 +62,7 @@ export class BasicViewTransformer implements IViewTransformer {
      */
     public setBaseContent(baseMap: Record<number, number[][]>): void {
         this._baseMap = baseMap;
+        console.log('[BasicViewTransformer.setBaseContent] _baseMap已更新：',this._baseMap);
     }
 
     /**
@@ -91,63 +84,54 @@ export class BasicViewTransformer implements IViewTransformer {
     }
 
     /**
-     *  設置基本盤顏色旋轉索引
-     * 此方法由 GameFactoryManager 在 setupRoomWithColorIndex 時調用
-     * 
-     * @param colorRotation 基本盤顏色旋轉索引 (0-3)
+     * 設定目前本機玩家視角。
+     * 此方法由 GameFactoryManager 在 setupLocalPlayerView 時呼叫。
+     *
+     * 目前用途：
+     * 1. 記錄本機玩家的真實座位索引，供 getLocalViewIndex / getRealIndexFromView 使用。
+     * 2. 設定「基本盤座標轉到目前玩家視角」所需的資料旋轉次數。
+     *
+     * @param currentPlayerView 本機玩家真實座位索引（0-3）
      */
-    public setBaseColorRotation(colorRotation: number): void {
-        this._baseColorRotation = colorRotation % 4;
-        console.log(`[BasicViewTransformer] setBaseColorRotation 被调用，设置 _baseColorRotation = ${this._baseColorRotation}`);
-    }
-
-    /**
-     * 🆕 設置總旋轉次數（用於雙重旋轉系統）
-     * 此方法由 GameFactoryManager 在 setupLocalPlayerView 時調用，
-     * 通知 ViewTransformer 當前實際的總旋轉次數
-     * 
-     * @param steps 總旋轉次數 (0-3)
-     * @param playerView 當前玩家視角索引（座位索引，0-3）
-     */
-    public setTotalRotation(steps: number, playerView: number): void {
-        this._totalRotationSteps = steps % 4;
+    public setCurrentPlayerView(playerView: number): void {
+        this._dataRotationSteps  = playerView % 4;
         this._currentPlayerView=playerView;
-        console.log(`[BasicViewTransformer] setTotalRotation 被调用，设置 _totalRotationSteps = ${this._totalRotationSteps}`);
+        //this._totalRotationSteps = steps % 4;---old
     }
 
     // ========== 座標轉換方法 ==========
 
     /**
      * 從基本盤座標轉換到指定玩家視角的座標
-     * 
-     * 🔧 修復說明（2026-05-02）：
-     * 原本完全忽略 currentPlayer 參數，導致 getOtherPlayerDestToGlobal 無法正確處理不同 playerView。
-     * 現在根據 currentPlayer 參數動態計算旋轉次數：rotations = (_baseColorRotation + currentPlayer) % 4
-     * 
+     * 這裡是以<從基本盤轉到玩家視角下的幾何旋轉計算>
+     *
      * @param row 基本盤的 row 座標
      * @param col 基本盤的 col 座標
      * @param currentPlayer 當前玩家視角索引（座位索引，0-3）
      * @returns 轉換後的座標 [row, col]
+     *
+     * 如果 row,col 是「某玩家自己座標系裡的相對座標」，那才需要：
+     * dataRotationSteps + queryPlayerSeatIndex
      */
     public baseToPlayerView(row: number, col: number, currentPlayer: number): [number, number] {
-        // 🔧 修復：根據 currentPlayer 動態計算旋轉次數
-        // rotations = 基本盤顏色旋轉 + 座位索引
-        const rotations = (this._baseColorRotation + currentPlayer) % 4;
-        console.log(`[baseToPlayerView] 输入: [${row}, ${col}], currentPlayer=${currentPlayer}, baseColorRotation=${this._baseColorRotation}, 旋转次数: ${rotations}`);
         
+        //const rotations = (this._baseColorRotation + currentPlayer) % 4;
+        const rotations = this._dataRotationSteps; // 直接使用數據旋轉次數，因為它已經在 setCurrentPlayerView 中根據 playerView 設置好了
+        const MAX = 14;
+
         let r = row;
         let c = col;
-
-        for (let i = 0; i < rotations; i++) {
-            // 逆時針旋轉90度公式: [r, c] → [14-c, r]
-            const temp = r;
-            r = this.BOARD_MAX_INDEX - c;
-            c = temp;
-            console.log(`[baseToPlayerView] 第${i+1}次旋转后: [${r}, ${c}]`);
+        console.log(`[baseToPlayerView] 输入基本盘坐标: [${row}, ${col}]，currentPlayer: ${currentPlayer}，计算 rotations: ${rotations}`);
+        switch (rotations) {
+            case 1: // 順時針 90 度 (旋轉 1 步 )
+                return [c, MAX - r];
+            case 2: // 順時針 180 度 (旋轉 2 步 )
+                return [MAX - r, MAX - c];
+            case 3: // 順時針 270 度 (旋轉 3步 )
+                return [MAX - c, r];
+            default: // 0 度 (原始狀態)
+                return [r, c];
         }
-
-        console.log(`[baseToPlayerView] 输出: [${r}, ${c}]`);
-        return [r, c];
     }
 
      /**
@@ -675,30 +659,11 @@ export class BasicViewTransformer implements IViewTransformer {
         return { playerIndex: playerType, slotIndex: arrayIndex };
     }
 
-
-    /**
-     * 根據 Slot ID 反查玩家類型和陣列索引
-     * @param slotId 坑位 ID（負數，如 -1, -2, ..., -16）
-     * @returns { playerType: 玩家類型, index: 在該玩家陣列中的索引 }，如果找不到則返回 null
-     * 
-     * 範例：
-     * - slotId = -2 → { playerType: 0, index: 1 }  (Blue 的第 2 個坑位)
-     * - slotId = -6 → { playerType: 1, index: 1 }  (Red 的第 2 個坑位)
-     */
-    /*
-    public getSlotInfo(slotId: number): { playerType: number, index: number } | null {
-        
-        const result = this.slotIdToIndex(slotId);
-        if (!result) return null;
-
-        const { playerIndex, slotIndex } = result;
-        return { playerType: playerIndex, index: slotIndex };
-    }*/
-
-
     //=========================即將刪除區域==============================================
     /**
      * 獲取從起點到終點的完整路徑段（基於起點索引）
+     *
+     * @deprecated 即將刪除，請改用 getPathSegmentInViewByStartIndex。
      * 
      * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
      * @param startIndex 起點索引（在該玩家路徑陣列中的索引位置）
@@ -725,6 +690,8 @@ export class BasicViewTransformer implements IViewTransformer {
 
     /**
      * 計算其他玩家從指定索引移動後的終點位置（返回當前玩家視角下的座標）
+     *
+     * @deprecated 即將刪除，請改用 getPathCoordInViewByStartIndex。
      * 
      * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
      * @param otherPlayer 在當前玩家視角下的其他玩家相對位置 (0:左下, 1:左上, 2:右上, 3:右下)
@@ -784,6 +751,8 @@ export class BasicViewTransformer implements IViewTransformer {
 
     /**
      * 計算其他玩家從指定索引移動後的路徑段（返回當前玩家視角下的座標）
+     *
+     * @deprecated 即將刪除，請改用 getPathSegmentInViewByStartIndex。
      * 
      * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
      * @param otherPlayer 在當前玩家視角下的其他玩家相對位置 (0:左下, 1:左上, 2:右上, 3:右下)
@@ -825,6 +794,8 @@ export class BasicViewTransformer implements IViewTransformer {
 
     /**
      * 計算從起點位置移動指定步數後的終點位置
+     *
+     * @deprecated 即將刪除，請改用 getPathCoordInViewByPos。
      * 
      * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
      * @param startPos 起點位置 [row, col]（玩家視角下的座標）
@@ -856,6 +827,8 @@ export class BasicViewTransformer implements IViewTransformer {
 
     /**
      * 獲取從起點到終點的完整路徑段（基於起點位置）
+     *
+     * @deprecated 即將刪除，請改用 getPathSegmentInViewByPos。
      * 
      * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
      * @param startPos 起點位置 [row, col]（玩家視角下的座標）
@@ -889,6 +862,8 @@ export class BasicViewTransformer implements IViewTransformer {
 
     /**
      * 計算從起點索引移動指定步數後的終點位置
+     *
+     * @deprecated 即將刪除，請改用 getPathCoordInViewByStartIndex。
      * 
      * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
      * @param startIndex 起點索引（在該玩家路徑陣列中的索引位置）
@@ -922,6 +897,8 @@ export class BasicViewTransformer implements IViewTransformer {
 
       /**
      * 從基地坑位基本盤座標轉換到指定玩家視角的座標
+     *
+     * @deprecated 即將刪除，基地坑位請改用 getPlayerBaseBySlotIndex / getPlayerBaseBySlotId / getPlayerBaseList。
      * 專門用於基地坑位的視角轉換（與路徑轉換邏輯不同）
      * 
      * 基地坑位使用區塊平移生成，需要特殊的視角轉換邏輯：

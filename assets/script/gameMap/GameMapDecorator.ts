@@ -1,7 +1,8 @@
 import { Node, Sprite, SpriteFrame, instantiate, Prefab, UITransform, Color, Vec2, Layers } from 'cc';
 import { GameMapCenter } from './GameMapCenter';
-import { MarkerType, DecorationType, GridState } from './def/GameMapDef';
+import { MarkerType, DecorationType, GridState, IMarker } from './def/GameMapDef';
 import { MapDecorationConfigGroup, MapDecorationItem, MarkerDirection } from '../factorySys/component/ConfigProperty';
+import { IViewTransformer } from '../factorySys/defs/path/PathFactoryDef';
 
 /**
  * 地圖裝飾器
@@ -18,6 +19,12 @@ import { MapDecorationConfigGroup, MapDecorationItem, MarkerDirection } from '..
  * ```
  */
 const DEFAULT_ICON_SIZE = 48; // 預設圖示大小
+
+type DecorationResource = {
+    icon: Prefab | SpriteFrame | null;
+    size: number;
+};
+
 export class GameMapDecorator {
     
     private _mapCenter: GameMapCenter;
@@ -29,6 +36,12 @@ export class GameMapDecorator {
     
     // 保存當前配置用於獲取尺寸等信息
     private _currentConfig: any = null;
+
+    // 新資料流程使用的裝飾資源表。applyDecorationData 只保存資源，renderDecorationView 才建立節點。
+    private _decorationResourceMap: Map<DecorationType, DecorationResource> = new Map();
+
+    // 新資料流程使用的裝飾座標表。陣列 index 對應真實座位 index。
+    private _decorationCoordMap: Map<DecorationType, [number, number][]> = new Map();
     
     // 調試信息（用於日志輸出）
     private _baseColorRotation: number = 0;
@@ -46,6 +59,8 @@ export class GameMapDecorator {
     
     /**
      * 設置箭頭圖示資源
+     *
+     * @deprecated old flow，即將刪除。新流程由 applyDecorationData 保存資源。
      * @param icon Prefab 或 SpriteFrame
      */
     public setArrowIcon(icon: Prefab | SpriteFrame): void {
@@ -54,6 +69,8 @@ export class GameMapDecorator {
     
     /**
      * 設置安全區圖示資源
+     *
+     * @deprecated old flow，即將刪除。新流程由 applyDecorationData 保存資源。
      * @param icon Prefab 或 SpriteFrame
      */
     public setSafeIcon(icon: Prefab | SpriteFrame): void {
@@ -62,6 +79,8 @@ export class GameMapDecorator {
     
     /**
      * 設置禁止符號圖示資源
+     *
+     * @deprecated old flow，即將刪除。新流程由 applyDecorationData 保存資源。
      * @param icon Prefab 或 SpriteFrame
      */
     public setForbiddenIcon(icon: Prefab | SpriteFrame): void {
@@ -72,6 +91,8 @@ export class GameMapDecorator {
     
     /**
      * 應用裝飾配置到地圖
+     *
+     * @deprecated old flow，即將刪除。新流程請使用 applyDecorationData 寫入資料，再由 renderDecorationView 建立視覺節點。
      * @param config 地圖裝飾配置
      * @param baseColorRotation 基本盤顏色旋轉（用於調試）
      * @param bgContainerAngle 背景容器旋轉角度（用於調試）
@@ -114,14 +135,256 @@ export class GameMapDecorator {
             default:
                 console.warn('[GameMapDecorator] 未知的裝飾模式:', config.mapMarkerMode);
         }
-       
-        
+
         console.log('[GameMapDecorator] 地圖裝飾完成');
     }
-    
-    
+
+    /**
+     * 只將基本盤裝飾資料寫入 GameMapCenter，不建立任何視覺節點。
+     * 視覺節點會等 setupLocalPlayerView 完成後，再由獨立流程依視角 mapping 建立。
+     * @param config 裝飾設定
+     */
+    public applyDecorationData(config: any): void {
+        console.log('[GameMapDecorator] 寫入基本盤裝飾資料...', config);
+
+        this._currentConfig = config;
+        this.saveDecorationResource(config);
+
+        switch (config.mapMarkerMode) {
+            case MarkerType.START:
+                this.markStartPointData(config.startPoints);
+                break;
+            case MarkerType.ARROW:
+                this.placeDecorationData(config.arrowPositions, DecorationType.ARROW);
+                break;
+            case MarkerType.SAFE:
+                this.placeDecorationData(config.safePositions, DecorationType.SAFE);
+                break;
+            case MarkerType.FORBIDDEN:
+                this.placeDecorationData(config.forbiddenPositions, DecorationType.FORBIDDEN);
+                break;
+            default:
+                console.warn('[GameMapDecorator] 不支援的裝飾資料類型', config.mapMarkerMode);
+        }
+
+        this._mapCenter.logSpecialGridData();
+    }
+
+    /**
+     * 保存 applyDecorationData 收到的各類裝飾資源。
+     * 這裡只記錄 icon/size，不建立任何節點，讓資料寫入與視覺渲染保持分離。
+     */
+    private saveDecorationResource(config: any): void {
+        switch (config.mapMarkerMode) {
+            case MarkerType.ARROW:
+                this._decorationResourceMap.set(DecorationType.ARROW, {
+                    icon: config.arrowIcon ?? null,
+                    size: config.arrowSize || DEFAULT_ICON_SIZE
+                });
+                break;
+            case MarkerType.SAFE:
+                this._decorationResourceMap.set(DecorationType.SAFE, {
+                    icon: config.safeIcon ?? null,
+                    size: config.safeSize || DEFAULT_ICON_SIZE
+                });
+                break;
+            case MarkerType.FORBIDDEN:
+                this._decorationResourceMap.set(DecorationType.FORBIDDEN, {
+                    icon: config.forbiddenIcon ?? null,
+                    size: config.forbiddenSize || DEFAULT_ICON_SIZE
+                });
+                break;
+        }
+    }
+
+    /**
+     * 清除目前由 renderDecorationView 建立的視覺節點。
+     * 只移除 marker.icon，不刪除基本盤 marker 資料與格子狀態。
+     */
+    public clearDecorationViewNodes(): void {
+        const allGrids = this._mapCenter.getAllGrids();
+        let clearCount = 0;
+
+        for (let r = 0; r < allGrids.length; r++) {
+            for (let c = 0; c < allGrids[r].length; c++) {
+                const grid = allGrids[r][c];
+                if (!grid || !grid.markers) {
+                    continue;
+                }
+
+                for (let i = 0; i < grid.markers.length; i++) {
+                    const marker = grid.markers[i];
+                    if (!this.isDecorationViewMarker(marker)) {
+                        continue;
+                    }
+
+                    if (marker.icon) {
+                        marker.icon.removeFromParent();
+                        marker.icon.destroy();
+                        marker.icon = null;
+                        clearCount++;
+                    }
+
+                    marker.visualCoord = marker.dataCoord;
+                }
+            }
+        }
+
+        console.log(`[GameMapDecorator] 已清除 ${clearCount} 個裝飾視覺節點`);
+    }
+
+    /**
+     * 依目前玩家視角，把基本盤 marker 資料渲染到對應的 visual grid。
+     * 目前只處理 icon 掛載位置，不做箭頭方向 mapping。
+     * @param viewTransformer 視角轉換器
+     * @param realPlayerIndex Server 給的本機玩家真實座位索引
+     * @param localViewIndex 本機玩家在目前畫面中的視覺座位索引
+     * @param config 裝飾設定資料，先保留給後續 mapping/方向處理使用
+     */
+    public renderDecorationView(viewTransformer: IViewTransformer, realPlayerIndex: number, localViewIndex: number, config: any = null): void {
+        this.clearDecorationViewNodes();
+        console.log('[GameMapDecorator] renderDecorationView config:', config);
+
+        const allGrids = this._mapCenter.getAllGrids();
+        let renderCount = 0;
+
+        for (let r = 0; r < allGrids.length; r++) {
+            for (let c = 0; c < allGrids[r].length; c++) {
+                const grid = allGrids[r][c];
+                if (!grid || !grid.markers) {
+                    continue;
+                }
+
+                for (let i = 0; i < grid.markers.length; i++) {
+                    const marker = grid.markers[i];
+                    if (!this.isDecorationViewMarker(marker)) {
+                        continue;
+                    }
+
+                    const baseCoord = marker.dataCoord ?? [r, c];
+                    const [baseR, baseC] = baseCoord;
+                    const markerRealIndex = marker.playerIndex;
+                    if (markerRealIndex === undefined) {
+                        console.warn(`[GameMapDecorator] marker 缺少 playerIndex，略過 base=[${baseR}, ${baseC}]`);
+                        continue;
+                    }
+
+                    const markerLocalViewIndex = viewTransformer.getLocalViewIndex(markerRealIndex);
+                    const decorationType = marker.data?.decorationType as DecorationType;
+                    const [visualR, visualC] = viewTransformer.baseToPlayerView(baseR, baseC, realPlayerIndex);
+                    const visualGrid = this._mapCenter.getGridAt(visualR, visualC);
+                    if (!visualGrid) {
+                        console.warn(`[GameMapDecorator] 找不到 visual grid [${visualR}, ${visualC}]，base=[${baseR}, ${baseC}]`);
+                        continue;
+                    }
+
+                    const direction = this.resolveDirectionInView(marker, markerLocalViewIndex, config);
+                    const node = this.createDecorationViewNode(decorationType, direction);
+                    if (!node) {
+                        console.warn(`[GameMapDecorator] 無法建立裝飾視覺節點 type=${DecorationType[decorationType]}`);
+                        continue;
+                    }
+
+                    marker.icon = node;
+                    marker.visualCoord = [visualR, visualC];
+                    node.parent = visualGrid.containerNode;
+                    renderCount++;
+
+                    console.log(
+                        `[GameMapDecorator] renderDecorationView type=${DecorationType[decorationType]} base=[${baseR},${baseC}] visual=[${visualR},${visualC}] markerReal=${markerRealIndex} markerLocal=${markerLocalViewIndex} currentReal=${realPlayerIndex} currentLocal=${localViewIndex}`
+                    );
+                }
+            }
+        }
+
+        console.log(`[GameMapDecorator] 裝飾視覺渲染完成，共 ${renderCount} 個`);
+    }
+
+    /**
+     * 判斷 marker 是否屬於新裝飾視覺流程。
+     */
+    private isDecorationViewMarker(marker: IMarker): boolean {
+        return marker.type === MarkerType.ARROW
+            || marker.type === MarkerType.SAFE
+            || marker.type === MarkerType.FORBIDDEN;
+    }
+
+    /**
+     * 新視覺流程專用的節點建立方法。
+     * 箭頭方向由 renderDecorationView 解析後傳入，這裡只負責轉成節點角度。
+     */
+    private createDecorationViewNode(decorationType: DecorationType, direction: MarkerDirection): Node | null {
+        const resource = this._decorationResourceMap.get(decorationType);
+        const icon = resource?.icon ?? null;
+        const size = resource?.size ?? DEFAULT_ICON_SIZE;
+
+        let node: Node | null = null;
+        if (icon instanceof Prefab) {
+            node = instantiate(icon);
+        } else if (icon instanceof SpriteFrame) {
+            node = this.createSpriteNode(icon, this.getDecorationName(decorationType), size);
+        } else {
+            node = this.createPlaceholderNode(decorationType);
+        }
+
+        if (node && decorationType === DecorationType.ARROW && direction !== MarkerDirection.NONE) {
+            node.angle = this.getDirectionAngle(direction);
+        }
+
+        return node;
+    }
+
+    /**
+     * 箭頭方向依照 marker 所屬玩家在目前畫面上的 localViewIndex，
+     * 從 config.arrowPositions[localViewIndex] 取得。
+     */
+    private resolveDirectionInView(marker: IMarker, localViewIndex: number, config: any): MarkerDirection {
+        if (marker.type !== MarkerType.ARROW) {
+            return marker.data?.direction ?? MarkerDirection.NONE;
+        }
+
+        const configList = Array.isArray(config) ? config : [config];
+        const arrowConfig = configList.find(configSetting => configSetting?.mapMarkerMode === MarkerType.ARROW);
+        const arrowItem = arrowConfig?.arrowPositions?.[localViewIndex];
+        if (!arrowItem) {
+            console.warn(`[GameMapDecorator] 找不到 arrowPositions[${localViewIndex}]，改用 marker 原始方向`);
+            return marker.data?.direction ?? MarkerDirection.NONE;
+        }
+        console.log('[resolveDirectionInView] localViewIndex=', localViewIndex, 'arrowItem=', arrowItem);
+        return arrowItem.direction ?? MarkerDirection.NONE;
+    }
+
+    /**
+     * 透過畫面座位 index 取得該類裝飾的顯示座標。
+     */
+    private getDecorationCoordByViewIndex(decorationType: DecorationType, viewIndex: number): [number, number] | null {
+        const coordList = this._decorationCoordMap.get(decorationType);
+        return coordList?.[viewIndex] ?? null;
+    }
+
+    /**
+     * 基本方向對應角度。
+     */
+    private getDirectionAngle(direction: MarkerDirection): number {
+        switch (direction) {
+            case MarkerDirection.UP:
+                return 0;
+            case MarkerDirection.RIGHT:
+                return -90;
+            case MarkerDirection.DOWN:
+                return 180;
+            case MarkerDirection.LEFT:
+                return 90;
+            default:
+                return 0;
+        }
+    }
+
+
     /**
      * 標記起點格子
+     *
+     * @deprecated old flow，即將刪除。新流程請使用 markStartPointData。
      * @param startPoints 起點坐標列表 (Vec2[] 或 number[][])
      *                    陣列 index 對應玩家索引 (0:Blue, 1:Red, 2:Green, 3:Yellow)
      */
@@ -162,15 +425,38 @@ export class GameMapDecorator {
         
         console.log(`[GameMapDecorator] 已標記 ${startPoints.length} 個起點`);
     }
-    
+
     /**
-     * 放置裝飾圖示
-     * @param positions 位置列表 (Vec2[] 或 number[][])
-     *                  陣列 index 對應玩家索引 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @param decorationType 裝飾類型
+     * 只寫入起點資料，不建立視覺節點。
      */
+    private markStartPointData(startPoints: Vec2[] | number[][]): void {
+        if (!startPoints || startPoints.length === 0) {
+            console.warn('[GameMapDecorator] 沒有起點資料可寫入');
+            return;
+        }
+
+        for (let playerIndex = 0; playerIndex < startPoints.length; playerIndex++) {
+            const coord = this.resolveDecorationCoord(startPoints[playerIndex]);
+            if (!coord) {
+                console.warn('[GameMapDecorator] 起點資料座標格式錯誤', startPoints[playerIndex]);
+                continue;
+            }
+
+            const [r, c] = coord;
+            this._mapCenter.setGridState(r, c, GridState.START_POINT);
+            this._mapCenter.addMarker(r, c, {
+                type: MarkerType.START,
+                icon: null,
+                data: { isStartPoint: true },
+                playerIndex: playerIndex
+            });
+        }
+    }
+
     /**
      * 放置裝飾
+     *
+     * @deprecated old flow，即將刪除。新流程請使用 placeDecorationData。
      * @param positions 位置列表 (Vec2[] | number[][] | MapDecorationItem[])
      *                  陣列 index 對應玩家索引 (0:Blue, 1:Red, 2:Green, 3:Yellow)
      * @param decorationType 裝飾類型
@@ -219,7 +505,100 @@ export class GameMapDecorator {
     }
     
     /**
+     * 只寫入裝飾資料，不建立視覺節點。
+     */
+    private placeDecorationData(positions: Vec2[] | number[][] | MapDecorationItem[], decorationType: DecorationType): void {
+        if (!positions || positions.length === 0) {
+            return;
+        }
+
+        const coordList: [number, number][] = [];
+        for (let playerIndex = 0; playerIndex < positions.length; playerIndex++) {
+            const parsed = this.resolveDecorationData(positions[playerIndex]);
+            if (!parsed) {
+                console.warn('[GameMapDecorator] 裝飾資料座標格式錯誤', positions[playerIndex]);
+                continue;
+            }
+
+            const [r, c] = parsed.coord;
+            coordList[playerIndex] = [r, c];
+            this._mapCenter.addMarker(r, c, {
+                type: this.decorationDataToMarkerType(decorationType),
+                icon: null,
+                data: {
+                    decorationType: decorationType,
+                    direction: parsed.direction
+                },
+                playerIndex: playerIndex
+            });
+
+            const grid = this._mapCenter.getGridAt(r, c);
+            if (grid) {
+                grid.isSpecial = true;
+            }
+        }
+
+        this._decorationCoordMap.set(decorationType, coordList);
+    }
+
+    private resolveDecorationData(source: Vec2 | number[] | MapDecorationItem): { coord: [number, number], direction: MarkerDirection } | null {
+        let direction: MarkerDirection = MarkerDirection.NONE;
+
+        if (source instanceof MapDecorationItem || (source && typeof source === 'object' && 'position' in source && 'direction' in source)) {
+            const item = source as MapDecorationItem;
+            direction = item.direction;
+            return { coord: [item.position.x, item.position.y], direction };
+        }
+
+        const coord = this.resolveDecorationCoord(source);
+        if (!coord) {
+            return null;
+        }
+
+        return { coord, direction };
+    }
+
+    private resolveDecorationCoord(source: Vec2 | number[] | MapDecorationItem): [number, number] | null {
+        if (source instanceof Vec2) {
+            return [source.x, source.y];
+        }
+
+        if (Array.isArray(source)) {
+            if (source.length < 2) {
+                return null;
+            }
+            return [source[0], source[1]];
+        }
+
+        if (source instanceof MapDecorationItem || (source && typeof source === 'object' && 'position' in source)) {
+            const item = source as MapDecorationItem;
+            return [item.position.x, item.position.y];
+        }
+
+        return null;
+    }
+
+    /**
+     * applyDecorationData 專用的類型轉換。
+     * 資料寫入流程保持獨立，不共用原本視覺流程使用的 decorationToMarkerType。
+     */
+    private decorationDataToMarkerType(decorationType: DecorationType): MarkerType {
+        switch (decorationType) {
+            case DecorationType.ARROW:
+                return MarkerType.ARROW;
+            case DecorationType.SAFE:
+                return MarkerType.SAFE;
+            case DecorationType.FORBIDDEN:
+                return MarkerType.FORBIDDEN;
+            default:
+                return MarkerType.NONE;
+        }
+    }
+
+    /**
      * 在指定格子放置裝飾
+     *
+     * @deprecated old flow，即將刪除。新流程只寫 marker data，視覺節點由 renderDecorationView 建立。
      * @param r 行索引
      * @param c 列索引
      * @param decorationType 裝飾類型
@@ -271,6 +650,8 @@ export class GameMapDecorator {
     
     /**
      * 創建裝飾節點
+     *
+     * @deprecated old flow，即將刪除。新流程請使用 createDecorationViewNode。
      * @param decorationType 裝飾類型
      * @param direction 方向（用於箭頭旋轉）
      * @param r 行索引（用於日志）
@@ -381,6 +762,8 @@ export class GameMapDecorator {
     
     /**
      * 將裝飾類型轉換為標記類型
+     *
+     * @deprecated old flow，即將刪除。新流程請使用 decorationDataToMarkerType。
      * @param decorationType 裝飾類型
      * @returns 標記類型
      */
@@ -417,6 +800,8 @@ export class GameMapDecorator {
     
     /**
      * 應用方向旋轉到節點
+     *
+     * @deprecated old flow，即將刪除。新流程由 resolveDirectionInView 搭配 getDirectionAngle 處理。
      * @param node 要旋轉的節點
      * @param direction 方向枚舉
      * @param r 行索引
@@ -432,23 +817,63 @@ export class GameMapDecorator {
              [MarkerDirection.LEFT]: 90
         };
         const baseAngle = angleMap[direction] || 0;
-        
+
         console.log(`🎯 [applyDirectionRotation] 第一次放置箭头:`);
         console.log(`   位置: [${r}, ${c}]`);
         console.log(`   playerIndex: ${playerIndex}`);
         console.log(`   direction: ${MarkerDirection[direction]} (${direction})`);
         console.log(`   设置角度: ${baseAngle}°`);
-        
+
         node.angle = baseAngle;
-        
+
         console.log(`   实际角度: ${node.angle}°`);
     }
-    
-    // ========== 更新功能 ==========
-    
+
+    // ========== 清理功能 ==========
+
+    /**
+     * 移除所有裝飾
+     */
+    public clearAllDecorations(): void {
+        const gridSize = this._mapCenter.getGridSize();
+
+        for (let r = 0; r < gridSize; r++) {
+            for (let c = 0; c < gridSize; c++) {
+                this._mapCenter.clearMarkers(r, c);
+            }
+        }
+
+        console.log('[GameMapDecorator] 已清除所有裝飾');
+    }
+
+    /**
+     * 移除特定類型的裝飾
+     * @param decorationType 裝飾類型
+     */
+    public clearDecorationsByType(decorationType: DecorationType): void {
+        const gridSize = this._mapCenter.getGridSize();
+        const markerType = this.decorationToMarkerType(decorationType);
+        const decorationName = this.getDecorationName(decorationType);
+
+        let count = 0;
+        for (let r = 0; r < gridSize; r++) {
+            for (let c = 0; c < gridSize; c++) {
+                if (this._mapCenter.removeMarker(r, c, markerType)) {
+                    count++;
+                }
+            }
+        }
+
+        console.log(`[GameMapDecorator] 已移除 ${count} 個${decorationName}`);
+    }
+
+    // ========== 即將刪除區域：舊箭頭方向更新流程 ==========
+
     /**
      * 更新箭头旋转角度（用于视角切换时）
-     * 
+     *
+     * @deprecated old flow，即將刪除。新流程由 renderDecorationView 建立節點時直接套用方向。
+     *
      * 核心逻辑：
      * 1. 箭头挂在 boardContainerNode 下的格子中，该父节点不旋转
      * 2. 因此箭头的 angle 属性直接等于屏幕显示角度
@@ -459,11 +884,11 @@ export class GameMapDecorator {
         const gridSize = this._mapCenter.getGridSize();
         let updateCount = 0;
         let totalArrowCount = 0;
-        
+
         console.log('\n========================================')
         console.log('🔄 updateArrowRotations 调用');
         console.log('========================================')
-        
+
         // 【调试】先遍历所有箭头，看看有多少个
         console.log('\n📊 扫描所有箭头位置:');
         for (let r = 0; r < gridSize; r++) {
@@ -485,7 +910,7 @@ export class GameMapDecorator {
             }
         }
         console.log(`\n总共找到 ${totalArrowCount} 个箭头\n`);
-        
+
         // 核心逻辑：根据箭头当前位置确定座位索引和方向
         // setupLocalPlayerView 后，箭头的位置是固定的：
         // - [0, 7]（上方）→ 座位0 → UP
@@ -498,7 +923,7 @@ export class GameMapDecorator {
             '14,7': { seatIndex: 2, direction: MarkerDirection.DOWN },
             '7,14': { seatIndex: 3, direction: MarkerDirection.LEFT }
         };
-        
+
         for (let r = 0; r < gridSize; r++) {
             for (let c = 0; c < gridSize; c++) {
                 const grid = this._mapCenter.getGridAt(r, c);
@@ -516,20 +941,20 @@ export class GameMapDecorator {
                                     actualC = parseInt(match[2]);
                                 }
                             }
-                            
+
                             const posKey = `${actualR},${actualC}`;
                             const mapping = positionToSeatAndDirection[posKey];
-                            
+
                             if (mapping) {
                                 // 更新 playerIndex（修正旋转后的错误）
                                 const oldPlayerIndex = marker.playerIndex;
                                 marker.playerIndex = mapping.seatIndex;
-                                
+
                                 // 更新方向枚举值
                                 if (marker.data) {
                                     const oldDirection = marker.data.direction;
                                     marker.data.direction = mapping.direction;
-                                    
+
                                     console.log(`\n📍 箭头更新:`);
                                     console.log(`  遍历位置 [r,c]: [${r}, ${c}]`);
                                     console.log(`  🔑 实际位置 (从parent): [${actualR}, ${actualC}]`);
@@ -540,7 +965,7 @@ export class GameMapDecorator {
                                     console.log(`  旧方向: ${MarkerDirection[oldDirection]} (${oldDirection})`);
                                     console.log(`  新方向: ${MarkerDirection[mapping.direction]} (${mapping.direction})`);
                                 }
-                                
+
                                 // 根据新的方向计算角度
                                 // 箭头图片本身朝上（0°）
                                 const angleMap = {
@@ -549,15 +974,15 @@ export class GameMapDecorator {
                                     [MarkerDirection.DOWN]: 180,
                                     [MarkerDirection.LEFT]: 90
                                 };
-                                
+
                                 const baseAngle = angleMap[mapping.direction] || 0;
-                                
+
                                 // 【关键】归零后直接设置目标角度
                                 // 因为父节点（boardContainerNode）不旋转，angle 属性直接等于屏幕显示角度
                                 const oldAngle = marker.icon.angle;
                                 marker.icon.angle = 0;  // 先归零
                                 marker.icon.angle = baseAngle;  // 直接设置目标角度
-                                
+
                                 console.log(`  设置前角度: ${oldAngle}°`);
                                 console.log(`  目标角度: ${baseAngle}°`);
                                 console.log(`  设置后角度: ${marker.icon.angle}°`);
@@ -568,7 +993,7 @@ export class GameMapDecorator {
                                 console.log(`  父节点angle: ${marker.icon.parent?.angle || 0}°`);
                                 console.log(`  父父节点: ${marker.icon.parent?.parent?.name || 'null'}`);
                                 console.log(`  父父节点angle: ${marker.icon.parent?.parent?.angle || 0}°`);
-                                
+
                                 // 【测试】如果是 [0,7]，隐藏箭头验证是否同一个节点(數據)
                                 /*
                                 if (r === 0 && c === 7) {
@@ -580,14 +1005,14 @@ export class GameMapDecorator {
                                     console.log(`  🔴 [测试] 隐藏显示在下方的箭头`);
                                     marker.icon.active = false;
                                 }
-                                                                
+
                                 // 【强制刷新】标记节点为脏
                                 if (marker.icon._uiProps && marker.icon._uiProps.uiTransformComp) {
                                     marker.icon._uiProps.uiTransformComp.setContentSize(
                                         marker.icon._uiProps.uiTransformComp.contentSize
                                     );
                                 }
-                                
+
                                 updateCount++;
                             } else {
                                 console.warn(`⚠️ 箭头位置 [${r},${c}] 不在预期的4个位置中，跳过`);
@@ -597,46 +1022,10 @@ export class GameMapDecorator {
                 }
             }
         }
-        
+
         console.log(`\n✅ 共更新 ${updateCount} 个箭头`);
         console.log('========================================\n');
     }
-    
-    // ========== 清理功能 ==========
-    
-    /**
-     * 移除所有裝飾
-     */
-    public clearAllDecorations(): void {
-        const gridSize = this._mapCenter.getGridSize();
-        
-        for (let r = 0; r < gridSize; r++) {
-            for (let c = 0; c < gridSize; c++) {
-                this._mapCenter.clearMarkers(r, c);
-            }
-        }
-        
-        console.log('[GameMapDecorator] 已清除所有裝飾');
-    }
-    
-    /**
-     * 移除特定類型的裝飾
-     * @param decorationType 裝飾類型
-     */
-    public clearDecorationsByType(decorationType: DecorationType): void {
-        const gridSize = this._mapCenter.getGridSize();
-        const markerType = this.decorationToMarkerType(decorationType);
-        const decorationName = this.getDecorationName(decorationType);
-        
-        let count = 0;
-        for (let r = 0; r < gridSize; r++) {
-            for (let c = 0; c < gridSize; c++) {
-                if (this._mapCenter.removeMarker(r, c, markerType)) {
-                    count++;
-                }
-            }
-        }
-        
-        console.log(`[GameMapDecorator] 已移除 ${count} 個${decorationName}`);
-    }
+
+    // ========== 即將刪除區域結束：舊箭頭方向更新流程 ==========
 }

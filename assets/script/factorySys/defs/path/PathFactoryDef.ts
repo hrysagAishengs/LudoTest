@@ -111,44 +111,33 @@ export interface IViewTransformer {
     setOriginalBaseContent(originalBaseMap: Record<number, number[][]>): void;
     
     /**
-     *  設置總旋轉次數（用於雙重旋轉系統）
-     * 此方法由 GameFactoryManager 在 setupLocalPlayerView 時調用，
-     * 通知 ViewTransformer 當前實際的總旋轉次數
-     * 
-     * @param steps 總旋轉次數 (0-3)
-     * @param currentPlayerView 當前玩家視角索引（座位索引，0-3）
-     * 
-     * 背景說明：
-     * 在雙重旋轉系統中，底圖會經歷兩次旋轉：
-     * 1. 第一次旋轉：隨機基本盤設置（setupRandomBaseboard）
-     * 2. 第二次旋轉：玩家視角設置（setupLocalPlayerView）
-     * 
-     * baseToPlayerView 需要知道實際的總旋轉次數才能正確轉換座標
+     * 設定目前本機玩家視角。
+     * 此方法由 GameFactoryManager 在 setupLocalPlayerView 時呼叫。
+     *
+     * 目前用途：
+     * 1. 記錄本機玩家的真實座位索引，供 getLocalViewIndex / getRealIndexFromView 使用。
+     * 2. 設定「基本盤座標轉到目前玩家視角」所需的資料旋轉次數。
+     *
+     * @param currentPlayerView 本機玩家真實座位索引（0-3）
      */
-    setTotalRotation(steps: number, currentPlayerView: number): void;
+    setCurrentPlayerView(currentPlayerView: number): void;
     
     /**
-     * 設置基本盤顏色旋轉索引
-     * 此方法由 GameFactoryManager 在 setupRoomWithColorIndex 時調用
-     * 
-     * @param colorRotation 基本盤顏色旋轉索引 (0-3)
-     * 
-     * 背景說明：
-     * 讓 ViewTransformer 知道基本盤的顏色旋轉索引，
-     * 以便在 baseToPlayerView 中正確計算每個 playerView 的旋轉次數
+     * 舊流程使用：設置基本盤顏色旋轉索引。
+     * 目前 baseToPlayerView 已改用 setCurrentPlayerView 設定的資料旋轉次數。
      */
-    setBaseColorRotation(colorRotation: number): void;
+    //setBaseColorRotation(colorRotation: number): void;
     
     // === 座標轉換方法 ===
     
     /**
-     * 從基本盤座標轉換到指定玩家視角的座標
-     * @param row 基本盤的 row 座標
-     * @param col 基本盤的 col 座標
-     * @param currentPlayer 當前在左下角的玩家 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @returns 轉換後的座標 [row, col]
-     * 
-     * 示例：Blue的基本盤起點 [1,6] 在Yellow視角下是 [8,1]
+     * 將基本盤全局座標轉換到目前本機玩家視角下的畫面座標。
+     * row / col 必須是整張基本盤上的全局座標，不是某玩家自己的相對座標。
+     *
+     * @param row 基本盤 row 座標
+     * @param col 基本盤 col 座標
+     * @param currentPlayer 保留參數；目前全局座標轉換不依賴此值
+     * @returns 目前玩家視角下的座標 [row, col]
      */
     baseToPlayerView(row: number, col: number, currentPlayer: number): [number, number];
     
