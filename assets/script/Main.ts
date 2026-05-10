@@ -4,6 +4,7 @@ import { LudoGameMode } from './gameDef/GameDef';
 import { IRollData, SimpleSlot } from './simpleSlot/SimpleSlot';
 import { TestShader } from '../shader/testShaderComp/TestShader';
 import { TestShader_OG } from '../shader/testShaderComp/TestShader_OG';
+import { RectBoardFillLine } from '../shader/shaderComp/RectBoardFillLine';
 //import { BasicBoardGenerator } from './map/board/factory/board/BasicBoardGenerator';
 
 
@@ -21,6 +22,9 @@ export class Main extends Component {
     @property({type:TestShader,displayName:"測試用Shader",tooltip:"用於測試的Shader組件",visible:true})
     private _testShader: TestShader = null!;
 
+    @property({type:RectBoardFillLine,displayName:"測試用Shader",tooltip:"用於測試的Shader組件",visible:true})
+    private _testRectBoardFillLine: RectBoardFillLine = null!;
+
     @property({type:TestShader_OG,displayName:"測試用Shader",tooltip:"用於測試的Shader組件",visible:true})
     private _testShader_OG: TestShader_OG = null!;
 
@@ -31,8 +35,10 @@ export class Main extends Component {
 
     public async testBtn():Promise<void>{
         // 測試按鈕觸發的邏輯
+        this._testRectBoardFillLine.playProgressTween(1, 1, 0);//無->有
+        //this._testShader.playProgressTween(1, 1, 0);//無->有
         //this._testShader.playProgressTween(1, 0, 1);//無->有
-        this._testShader_OG.playProgressTween(1, 1, 0);//-有->無
+        //this._testShader_OG.playProgressTween(1, 1, 0);//-有->無
         /*
         const myData: IRollData[] = [
             { symbolId: 0 }, 

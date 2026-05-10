@@ -1,4 +1,4 @@
-CCEffect %{
+﻿CCEffect %{
   techniques:
   - passes:
     - vert: sprite-vs:virt
@@ -16,12 +16,22 @@ CCEffect %{
         cullMode: none
       properties:
         borderColor: { value: [0.0, 1.0, 0.0, 1.0], editor: { type: color } }
+        borderColor2: { value: [1.0, 0.0, 0.0, 1.0], editor: { type: color } }
         spriteInfo: { value: [100.0, 100.0, 0.5, 0.5] }
         uvRect: { value: [0.0, 0.0, 1.0, 1.0] }
         alphaThreshold: { value: 0.5 }
         progress: { value: 1.0, editor: { slide: true, range: [0, 1.0], step: 0.01 } }
         thickness: { value: 0.1, editor: { slide: true, range: [0, 0.5], step: 0.01 } }
+        thicknessPx: { value: 10.0, editor: { slide: true, range: [0, 100.0], step: 1.0 } }
+        useThicknessPx: { value: 0.0, editor: { slide: true, range: [0, 1.0], step: 1.0 } }
         direction: { value: 0.0, editor: { slide: true, range: [0, 1.0], step: 1.0 } }
+        startOffset: { value: 0.125, editor: { slide: true, range: [0, 1.0], step: 0.001 } }
+        colorSwitchProgress: { value: 0.5, editor: { slide: true, range: [0, 1.0], step: 0.01 } }
+        colorProgressMode: { value: 0.0, editor: { slide: true, range: [0, 1.0], step: 1.0 } }
+        useColorBlend: { value: 0.0, editor: { slide: true, range: [0, 1.0], step: 1.0 } }
+        padding0: { value: 0.0 }
+        padding1: { value: 0.0 }
+        padding2: { value: 0.0 }
 }%
 
 CCProgram sprite-vs %{
@@ -80,9 +90,19 @@ CCProgram sprite-fs %{
     vec4 borderColor;
     vec4 spriteInfo;
     vec4 uvRect;
+    vec4 borderColor2;
     float progress;
     float thickness;
+    float thicknessPx;
+    float useThicknessPx;
     float direction;
+    float startOffset;
+    float colorSwitchProgress;
+    float colorProgressMode;
+    float useColorBlend;
+    float padding0;
+    float padding1;
+    float padding2;
   };
 
   #pragma builtin(local)
@@ -92,24 +112,25 @@ CCProgram sprite-fs %{
     // 除錯用：觀察 atlas / SpriteFrame 的 UV 範圍。
     // return vec4(v_uv0.x * 10.0, v_uv0.y * 10.0, 0.0, 1.0);
 
-    /*
-    舊版：直接使用 v_uv0 當作邊框 UV。
-    如果 SpriteFrame 來自 atlas 或有裁切，v_uv0 不一定是 Sprite 自己的 0~1。
-    vec2 uv = v_uv0;
-    */
+    
+    //舊版：直接使用 v_uv0 當作邊框 UV。
+    //如果 SpriteFrame 來自 atlas 或有裁切，v_uv0 不一定是 Sprite 自己的 0~1。
+    //vec2 uv = v_uv0;
+    
 
-    /*
+    
     // 另一種嘗試：用 Sprite local position、尺寸與 anchor 換算 Sprite 自己的 0~1 UV。
-    vec2 spriteSize = max(spriteInfo.xy, vec2(0.0001, 0.0001));
-    vec2 spriteAnchor = spriteInfo.zw;
-    vec2 uv = (v_localPos + spriteSize * spriteAnchor) / spriteSize;
-    uv = clamp(uv, 0.0, 1.0);
-    */
+    //vec2 spriteSize = max(spriteInfo.xy, vec2(0.0001, 0.0001));
+    //vec2 spriteAnchor = spriteInfo.zw;
+    //vec2 uv = (v_localPos + spriteSize * spriteAnchor) / spriteSize;
+    //uv = clamp(uv, 0.0, 1.0);
+    
 
     // 目前使用的版本：
     // v_uv0 是真正用來取樣貼圖 / atlas 的 UV。
     // uvRect 由 TS 根據 SpriteFrame.uv 算出：[minU, minV, width, height]。
     // 用 uvRect 將 v_uv0 正規化成 Sprite 自己的 0~1 UV，專門拿來判斷邊框。
+
     vec2 uvSize = max(uvRect.zw, vec2(0.0001, 0.0001));
     vec2 uv = (v_uv0 - uvRect.xy) / uvSize;
     uv = clamp(uv, 0.0, 1.0);
@@ -117,23 +138,27 @@ CCProgram sprite-fs %{
     // 取樣原圖仍然使用 v_uv0，因為圖片可能來自 atlas。
     vec4 o = CCSampleWithAlphaSeparated(cc_spriteTexture, v_uv0) * v_color;
 
+    vec2 thicknessRatio = vec2(thickness);
+    vec2 thicknessPixel = thicknessPx / max(spriteInfo.xy, vec2(0.0001, 0.0001));
+    vec2 borderThickness = useThicknessPx > 0.5 ? thicknessPixel : thicknessRatio;
+
     // 邊框判斷使用 Sprite 自己的 UV，所以 thickness 會相對於這個 Sprite 的矩形。
     bool inBorder = (
-      uv.x < thickness ||
-      uv.x > 1.0 - thickness ||
-      uv.y < thickness ||
-      uv.y > 1.0 - thickness
+      uv.x < borderThickness.x ||
+      uv.x > 1.0 - borderThickness.x ||
+      uv.y < borderThickness.y ||
+      uv.y > 1.0 - borderThickness.y
     );
 
     // 將四個邊框邊緣轉成一條連續的 0~1 路徑。
     float currentPath = 0.0;
-    if (uv.y <= thickness) {
+    if (uv.y <= borderThickness.y) {
       currentPath = uv.x * 0.25;
-    } else if (uv.x >= 1.0 - thickness) {
+    } else if (uv.x >= 1.0 - borderThickness.x) {
       currentPath = 0.25 + uv.y * 0.25;
-    } else if (uv.y >= 1.0 - thickness) {
+    } else if (uv.y >= 1.0 - borderThickness.y) {
       currentPath = 0.5 + (1.0 - uv.x) * 0.25;
-    } else if (uv.x <= thickness) {
+    } else if (uv.x <= borderThickness.x) {
       currentPath = 0.75 + (1.0 - uv.y) * 0.25;
     }
 
@@ -142,8 +167,16 @@ CCProgram sprite-fs %{
       currentPath = 1.0 - currentPath;
     }
 
+    float actualStartOffset = direction > 0.5 ? 1.0 - startOffset : startOffset;
+    currentPath = fract(currentPath - actualStartOffset + 1.0);
+
     if (inBorder && currentPath <= progress) {
-      o = vec4(borderColor.rgb, o.a * borderColor.a);
+      float colorProgress = colorProgressMode > 0.5 ? 1.0 - progress : progress;
+      float blendT = smoothstep(colorSwitchProgress, 1.0, colorProgress);
+      vec4 switchColor = colorProgress >= colorSwitchProgress ? borderColor2 : borderColor;
+      vec4 blendColor = mix(borderColor, borderColor2, blendT);
+      vec4 activeBorderColor = useColorBlend > 0.5 ? blendColor : switchColor;
+      o = vec4(activeBorderColor.rgb, o.a * activeBorderColor.a);
     }
 
     ALPHA_TEST(o);

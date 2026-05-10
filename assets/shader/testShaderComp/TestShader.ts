@@ -1,4 +1,4 @@
-import { _decorator, Component, Material, Sprite, tween, UITransform, Vec4 } from 'cc';
+import { _decorator, Color, Component, Material, Sprite, tween, UITransform, Vec4 } from 'cc';
 const { ccclass, property } = _decorator;
 
 @ccclass('TestShader')
@@ -15,15 +15,14 @@ export class TestShader extends Component {
     }
 
     public playProgressTween(duration: number = 1, from: number = 1, to: number = 0): void {
-        if (!this._material) {
-            this._material = this.sprite.getMaterialInstance(0);
-        }
+        this.ensureMaterial();
         this.syncMaterialData();
 
         console.log('[TestShader] playProgressTween start');
         console.log('[TestShader] from:', from, 'to:', to);
 
         const state = { progress: from };
+        this._material.setProperty('colorProgressMode', from > to ? 1 : 0);
         this._material.setProperty('progress', state.progress);
 
         console.log('[TestShader] set progress:', state.progress);
@@ -36,6 +35,53 @@ export class TestShader extends Component {
                 }
             })
             .start();
+    }
+
+    public setRectBoardFillProperty(propertyName: string, value: number | Vec4 | Color): void {
+        this.ensureMaterial();
+        this.syncMaterialData();
+        this._material.setProperty(propertyName, value);
+    }
+
+    /**
+     * RectBoardFill2 startOffset reference:
+     * 0.000 = top left
+     * 0.125 = top center
+     * 0.250 = top right
+     * 0.375 = right center
+     * 0.500 = bottom right
+     * 0.625 = bottom center
+     * 0.750 = bottom left
+     * 0.875 = left center
+     *
+     * direction:
+     * 0 = original direction
+     * 1 = reverse direction
+     *
+     * colorProgressMode:
+     * 0 = color switch follows progress 0 -> 1
+     * 1 = color switch follows progress 1 -> 0
+     */
+    public setRectBoardFill2Setting(
+        startOffset: number = 0.125,
+        direction: number = 0,
+        thickness: number = 0.1,
+        progress: number = 1,
+        colorProgressMode: number = 0
+    ): void {
+        this.ensureMaterial();
+        this.syncMaterialData();
+        this._material.setProperty('startOffset', startOffset);
+        this._material.setProperty('direction', direction);
+        this._material.setProperty('thickness', thickness);
+        this._material.setProperty('progress', progress);
+        this._material.setProperty('colorProgressMode', colorProgressMode);
+    }
+
+    private ensureMaterial(): void {
+        if (!this._material) {
+            this._material = this.sprite.getMaterialInstance(0);
+        }
     }
 
     private syncMaterialData(): void {

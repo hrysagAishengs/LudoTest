@@ -26,7 +26,8 @@
   "_props": [
     {
       "progress": 0,
-      "thickness": 0.04
+      "thickness": 0.04,
+      "thicknessPx": 0
     }
   ]
 }

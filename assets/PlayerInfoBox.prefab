@@ -44,13 +44,10 @@
     "_components": [
       {
         "__id__": 64
-      },
-      {
-        "__id__": 66
       }
     ],
     "_prefab": {
-      "__id__": 68
+      "__id__": 66
     },
     "_lpos": {
       "__type__": "cc.Vec3",
@@ -427,7 +424,7 @@
     },
     "_lpos": {
       "__type__": "cc.Vec3",
-      "x": -4.1,
+      "x": 0,
       "y": 0,
       "z": 0
     },
@@ -678,7 +675,7 @@
     },
     "_lpos": {
       "__type__": "cc.Vec3",
-      "x": -12.323,
+      "x": 0,
       "y": 0,
       "z": 0
     },
@@ -756,7 +753,7 @@
       "a": 255
     },
     "_string": "id",
-    "_horizontalAlign": 1,
+    "_horizontalAlign": 0,
     "_verticalAlign": 1,
     "_actualFontSize": 20,
     "_fontSize": 20,
@@ -1007,7 +1004,7 @@
       "a": 255
     },
     "_string": "table",
-    "_horizontalAlign": 1,
+    "_horizontalAlign": 0,
     "_verticalAlign": 1,
     "_actualFontSize": 20,
     "_fontSize": 20,
@@ -1180,7 +1177,7 @@
     },
     "_lpos": {
       "__type__": "cc.Vec3",
-      "x": -9.609,
+      "x": 0,
       "y": 0,
       "z": 0
     },
@@ -1258,7 +1255,7 @@
       "a": 255
     },
     "_string": "info",
-    "_horizontalAlign": 1,
+    "_horizontalAlign": 0,
     "_verticalAlign": 1,
     "_actualFontSize": 20,
     "_fontSize": 20,
@@ -1509,7 +1506,7 @@
       "a": 255
     },
     "_string": "money",
-    "_horizontalAlign": 1,
+    "_horizontalAlign": 0,
     "_verticalAlign": 1,
     "_actualFontSize": 20,
     "_fontSize": 20,
@@ -1635,52 +1632,6 @@
   {
     "__type__": "cc.CompPrefabInfo",
     "fileId": "b63bZZ+atGCKcJH/k6i+V4"
-  },
-  {
-    "__type__": "1b38fXjXjtNToSqi5UmC3eE",
-    "_name": "",
-    "_objFlags": 0,
-    "__editorExtras__": {},
-    "node": {
-      "__id__": 1
-    },
-    "_enabled": true,
-    "__prefab": {
-      "__id__": 67
-    },
-    "_playerNameLabel": {
-      "__id__": 28
-    },
-    "_playerMoneyLabel": {
-      "__id__": 58
-    },
-    "_playerAvatar": {
-      "__id__": 11
-    },
-    "_diceAnimationNode": null,
-    "_diceResultSprite": null,
-    "_timerAnimationNode": null,
-    "_countdownLabel": null,
-    "_turnIndicator": null,
-    "_tipLabel": null,
-    "_autoModeIcon": null,
-    "_devTableLabel": {
-      "__id__": 38
-    },
-    "_devDiceResultLabel": {
-      "__id__": 18
-    },
-    "_devInfoLabel": {
-      "__id__": 48
-    },
-    "_bgNode": {
-      "__id__": 2
-    },
-    "_id": ""
-  },
-  {
-    "__type__": "cc.CompPrefabInfo",
-    "fileId": "82OBZaEaJDlau64ORhJh34"
   },
   {
     "__type__": "cc.PrefabInfo",

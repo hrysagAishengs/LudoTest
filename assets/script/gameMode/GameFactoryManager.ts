@@ -8,7 +8,6 @@ import { IPathGenerator, IViewTransformer } from '../factorySys/defs/path/PathFa
 import { GameMapCenter } from '../gameMap/GameMapCenter';
 import { GameMapDecorator } from '../gameMap/GameMapDecorator';
 import { IGridData, IMarker, MarkerType, GridState } from '../gameMap/def/GameMapDef';
-import { AniSysManager } from '../aniPresentSys/AniSysManager';
 import { PlayerColor } from '../gamePlayer/ColorSelector';
 
 const { ccclass, property } = _decorator;
@@ -57,25 +56,17 @@ export class GameFactoryManager extends Component {
     
     // 地圖管理中心
     private _gameMapCenter: GameMapCenter | null = null;
-    
     // 地圖裝飾器
-    private _mapDecorator: GameMapDecorator | null = null;
-    
-    // 房間玩家管理器
-    //private _roomPlayerManager: RoomPlayerManager | null = null;
-    
+    private _mapDecorator: GameMapDecorator | null = null; 
     // 背景容器節點引用（用於視角旋轉）
     private _bgContainerNode: Node | null = null;
-    
     // 原始數據（用於重映射）
     private _originalPathMap: Record<number, number[][]> | null = null;
     private _originalBaseMap: Record<number, number[][]> | null = null;
     private _originalSlotIdMap: Record<number, number[]> | null = null;
     private _originalDecorationConfigs: any[] | null = null;
-    
-    // 基準旋轉值（隨機基本盤的顏色索引）
-    //private _baseColorRotation: number = 0;
-    private _baseBoardRotationSteps: number = 0; // 基本盤相對原始盤旋轉了幾步 90 度(取代_baseColorRotation)
+    // 基本盤相對原始盤旋轉了幾步 90 度(取代_baseColorRotation)
+    private _baseBoardRotationSteps: number = 0; 
     private _roomMaxPlayerCount: number = 4;
     
     // 工廠註冊表
@@ -135,16 +126,14 @@ export class GameFactoryManager extends Component {
         if (config.boardConfig.boardResourceConfig.bgContainerNode) {
             this._bgContainerNode = config.boardConfig.boardResourceConfig.bgContainerNode;
         }
-        
+
         // 創建所有組件
         this._currentComponents = await this._currentFactory.createGameComponents();
         
         // 初始化地圖管理中心
         this.initializeGameMapCenter();
-        
         // 初始化地圖裝飾器
         this.initializeMapDecorator();
-        
         // 保存原始數據（在任何旋轉之前）
         this.saveOriginalData();
         
@@ -245,10 +234,8 @@ export class GameFactoryManager extends Component {
             console.warn('[GameFactoryManager] 地圖管理中心不存在，無法初始化裝飾器');
             return;
         }
-        
         // 創建裝飾器
         this._mapDecorator = new GameMapDecorator(this._gameMapCenter);
-        
         // 獲取裝飾配置
         const propertyMode = this.convertToPropertyMode(this._currentGameMode);
         const editorConfig = this._gameModeConfig.find(c => c.gameMode === propertyMode);
@@ -316,57 +303,23 @@ export class GameFactoryManager extends Component {
         this._bgContainerNode.setRotationFromEuler(0, 0, angle);
         */
     }
-    /**
-     * 旋轉棋盤視角以適配當前玩家
-     *
-     * @deprecated old flow，即將刪除。正式流程請使用 setupLocalPlayerView，裝飾物件位置由 renderDecorationView 處理。
-     * creator 的旋轉是逆時針為正（標準數學定義），因此旋轉角度計算如下
-     * 起始點0度是在右邊(箭頭朝右)
-     * 玩家位置映射：
-     * - 0: Blue (左下) → 0° (不旋轉)
-     * - 1: Red (左上) → 90°
-     * - 2: Green (右上) → 180°
-     * - 3: Yellow (右下) → 270°
-     * 
-     * @param playerIndex 當前玩家索引 (0:Blue左下, 1:Red左上, 2:Green右上, 3:Yellow右下)
-     */
-    public rotateBoardView(playerIndex: number): void {
-        if (!this._bgContainerNode) {
-            console.warn('[GameFactoryManager] 背景容器節點不存在，無法旋轉視角');
-            return;
-        }
-        
-        // 驗證 playerIndex
-        if (playerIndex < 0 || playerIndex > 3) {
-            console.error(`[GameFactoryManager] 無效的 playerIndex: ${playerIndex}，應在 0-3 之間`);
-            return;
-        }
-        
-        // 計算旋轉角度：angle = 角度(degree)
-        // playerIndex 0 → 0° (不旋轉)
-        // playerIndex 1 → 90°
-        // playerIndex 2 → 180°
-        // playerIndex 3 → 270°
-        //-Cocos Creator 的旋轉是逆時針=正（標準數學定義）
-        const angle = 90 * playerIndex;
-        
-        // 應用旋轉（使用尤拉角，Z軸旋轉）
-        this._bgContainerNode.setRotationFromEuler(0, 0, angle);
-        
-    }
+   
     
     /**
      * 重置棋盤視角到默認狀態（玩家 0 視角 - Blue 在底部）
-     *
-     * @deprecated old flow，即將刪除。此方法仍會走 rotateBoardView / resetMarkersView 舊流程。
      */
     public resetBoardView(): void {
-        this.rotateBoardView(0);        
+           
         // 重置標記到基本盤位置
         if (this._gameMapCenter) {
             this._gameMapCenter.resetMarkersView();
         }
-        // 重置面板到基本盤位置（已通過 rotateBoardView(0) 完成）
+
+        if(this._bgContainerNode){
+            // 應用旋轉（使用尤拉角，Z軸旋轉）
+            this._bgContainerNode.setRotationFromEuler(0, 0, 0);
+        }
+        
         console.log('[GameFactoryManager] 棋盤視角已重置到默認狀態');
     }    
     /**
@@ -477,8 +430,10 @@ export class GameFactoryManager extends Component {
                 if (filtered.arrowPositions) {
                     filtered.arrowPositions = filtered.arrowPositions.map((item: MapDecorationItem) => 
                         new MapDecorationItem(
+                            /*
                             new Vec2(item.position.x, item.position.y),
                             item.direction
+                            */
                         )
                     );
                 }
@@ -519,7 +474,7 @@ export class GameFactoryManager extends Component {
     /**
      * 根據隨機基本盤顏色重映射所有數據
      * @param baseColor - 基本盤左下角的顏色索引 (0-3)
-     * @private
+     * 
      */
     private remapAllDataByBaseColor(baseColor: number): void {
         
@@ -559,120 +514,7 @@ export class GameFactoryManager extends Component {
     // 新流程：initializeMapDecorator 先 applyDecorationData 寫入基本盤資料，
     // setupLocalPlayerView 再 renderDecorationView 建立視覺節點。
 
-    /**
-     * 重新應用裝飾配置（使用重映射後的數據）
-     *
-     * @deprecated old flow，即將刪除。新流程改用 applyDecorationData 寫入資料，再由 renderDecorationView 渲染視覺節點。
-     * @private
-     */
-    private reapplyDecorations(): void {
-        if (!this._mapDecorator || !this._gameMapCenter) {
-            console.warn('[GameFactoryManager] 裝飾器或地圖中心不存在，無法重新應用裝飾');
-            return;
-        }
-        
-        // 清除舊裝飾
-        this._mapDecorator.clearAllDecorations();
-        
-        // 使用保存的原始配置
-        if (this._originalDecorationConfigs && this._originalDecorationConfigs.length > 0) {
-            this._originalDecorationConfigs.forEach(config => {
-                // 創建副本避免修改原始數據
-                const configCopy = { ...config };
-                
-                // 重映射 startPoints（如果存在）
-                if (configCopy.startPoints && this._baseBoardRotationSteps !== 0) {
-                    configCopy.startPoints = this.remapStartPoints(configCopy.startPoints);
-                }
-                
-                // 重映射 arrowPositions（如果存在）
-                if (configCopy.arrowPositions && this._baseBoardRotationSteps !== 0) {
-                    configCopy.arrowPositions = this.remapArrowPositions(configCopy.arrowPositions);
-                }
-                
-                // 傳遞調試信息給裝飾器
-                const bgAngle = this._bgContainerNode ? this._bgContainerNode.angle : 0;
-                this._mapDecorator.applyDecoration(configCopy, this._baseBoardRotationSteps, bgAngle);
-            });
-        }
-        
-        console.log('[GameFactoryManager] 裝飾配置已重新應用');
-    }
     
-    /**
-     * 重映射起點座標陣列
-     *
-     * @deprecated old flow，即將刪除。新裝飾流程不再透過重映射後的 applyDecoration 建立視覺節點。
-     * @param originalPoints - 原始起點座標陣列 [Blue, Red, Green, Yellow]
-     * @returns 重映射後的起點座標陣列
-     * @private
-     */
-    private remapStartPoints(originalPoints: any[]): any[] {
-        const newPoints: any[] = [];
-        for (let i = 0; i < originalPoints.length; i++) {
-            const sourceIndex = (this._baseBoardRotationSteps + i) % 4;
-            newPoints[i] = originalPoints[sourceIndex];
-        }
-        return newPoints;
-    }
-    
-    /**
-     * 重映射箭頭位置和方向陣列
-     *
-     * @deprecated old flow，即將刪除。箭頭方向目前由 renderDecorationView 依 localViewIndex 從 config 取得。
-     * @param originalItems - 原始箭頭配置陣列 [Blue, Red, Green, Yellow]
-     * @returns 重映射後的箭頭配置陣列
-     * @private
-     * 
-     * 邏輯：position 和 direction 是綁定的（grid 位置決定方向）
-     * 重映射時直接把源配置的 position 和 direction 一起拿過來
-     */
-    private remapArrowPositions(originalItems: MapDecorationItem[]): MapDecorationItem[] {
-        const newItems: MapDecorationItem[] = [];
-        
-        for (let i = 0; i < originalItems.length; i++) {
-            const sourceIndex = (this._baseBoardRotationSteps + i) % 4;
-            const originalItem = originalItems[sourceIndex];
-            
-            // 直接使用源配置的 position 和 direction（它們是綁定的）
-            console.log(`[GameFactoryManager] 重映射箭頭[${i}]: 源索引=${sourceIndex}, position=(${originalItem.position.x},${originalItem.position.y}), direction=${originalItem.direction}(${MarkerDirection[originalItem.direction]})`);
-            
-            // 創建新Item（深拷貝避免修改原配置）
-            const newItem = new MapDecorationItem(
-                new Vec2(originalItem.position.x, originalItem.position.y),
-                originalItem.direction  // position 和 direction 一起拿過來
-            );
-            newItems[i] = newItem;
-        }
-        
-        return newItems;
-    }
-    
-    /**
-     * 根據旋轉次數轉換方向枚舉
-     *
-     * @deprecated old flow，即將刪除。箭頭方向目前由 renderDecorationView 依 localViewIndex 從 config 取得。
-     * @param direction - 原始方向
-     * @param rotationSteps - 旋轉次數 (0-3)，逆時針旋轉
-     * @returns 轉換後的方向
-     * @private
-     * 
-     * 轉換規則：
-     * - rotationSteps=0: 不變
-     * - rotationSteps=1 (90°): UP→LEFT, RIGHT→UP, DOWN→RIGHT, LEFT→DOWN
-     * - rotationSteps=2 (180°): UP→DOWN, RIGHT→LEFT, DOWN→UP, LEFT→RIGHT
-     * - rotationSteps=3 (270°): UP→RIGHT, RIGHT→DOWN, DOWN→LEFT, LEFT→UP
-     */
-    private rotateDirection(direction: MarkerDirection, rotationSteps: number): MarkerDirection {
-        if (direction === MarkerDirection.NONE) {
-            return direction;
-        }
-        
-        // 公式：逆時針旋轉 rotationSteps 次
-        // UP(1), RIGHT(2), DOWN(3), LEFT(4)
-        const newDir = ((direction - 1 + rotationSteps) % 4) + 1;
-        return newDir as MarkerDirection;
-    }
 
     // ========== 即將刪除區域結束：舊裝飾流程 ==========
     

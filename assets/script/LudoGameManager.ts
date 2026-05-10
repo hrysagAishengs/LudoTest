@@ -6,6 +6,10 @@ import { AniSysManager } from './aniPresentSys/AniSysManager';
 import { IPawnInfo } from './gamePlayer/def/PawnDef';
 import { Pawn } from './gamePlayer/Pawn';
 import { RoomPlayerManager } from './roomManager/RoomPlayerManager';
+import { MarkerType } from './gameMap/def/GameMapDef';
+import { ArrowComp } from './gamePlayer/ArrowComp';
+import { PlayerPanel } from './gamePlayer/PlayerPanel';
+import { RoundNotifyBaseNodeCtrl } from './aniPresentSys/ctrls/RoundNotifyBaseNodeCtrl';
 const { ccclass, property } = _decorator;
 
 /**
@@ -47,6 +51,9 @@ export class LudoGameManager extends Component {
     
     @property({type:AniSysManager,displayName:"動畫系統管理器",tooltip:"負責管理動畫系統的組件",visible:true})
     private _aniSysManager: AniSysManager = null!;
+
+    @property({type:RoundNotifyBaseNodeCtrl,displayName:"測試提示回合Node",tooltip:"用於顯示回合提示的Node",visible:true})
+    private _roundTipNode: RoundNotifyBaseNodeCtrl = null!;
 
     private _roomPlayerManager: RoomPlayerManager;
     private _roomMaxPlayerCount: number = 4;
@@ -232,11 +239,7 @@ export class LudoGameManager extends Component {
 
     public testPathMode(): void {
         
-       
-        
-       
-        // ========== 原有测试代码（已注释） ==========
-        //this._comprehensiveAPIValidation();
+    
         this._testRotation();
     }
 
@@ -260,17 +263,79 @@ export class LudoGameManager extends Component {
         testNode.setPosition(pos);
     }
 
+    public addTestFourPlayers(playerCount: number): Promise<number> {
+        
+        return new Promise<number>((resolve) => {
+            let count=0;
+            for (let seatIndex = 0; seatIndex < playerCount; seatIndex++) {
+                
+                this.scheduleOnce(() => {
+                    const playerInfo: IPlayerIdentity = {
+                        uid: `testPlayer_${seatIndex}`,
+                        nickname: `testPlayer_${seatIndex}`,
+                        avatarSpriteFrame: null,
+                    };
+                    count++;
+                    this.addPlayer(playerInfo, seatIndex);
+                    
+                    if(playerCount==2){
+                        const player = this._roomPlayerManager?.getPlayer(seatIndex);
+                        player.panel.showAll();
+                    }
+                    /*
+                    const player = this._roomPlayerManager?.getPlayer(seatIndex);
+                    
+                    const localViewIndex = player?.identity.localViewIndex;
+                    
+                    if (player && localViewIndex !== undefined) {
+                        player.panel.setLayout(this._roomMaxPlayerCount, localViewIndex);
+                    }*/
+
+                    if (count === playerCount) {
+                        resolve(playerCount);
+                    }
+                }, seatIndex * 1.5);
+            }
+        })
+
+    }
+
+    private async testAdjustSingleLayout(playerCount:number): Promise<void> {
+        //--針對每個玩家面板設置對應的布局(4P模式)
+        await this.addTestFourPlayers(playerCount);
+        for(let i=0;i<playerCount;i++){
+            const player=this._roomPlayerManager?.getPlayer(i);
+            const panel=player?.panel;
+            const localViewIndex=player?.identity.localViewIndex;
+            panel?.setLayout(this._roomMaxPlayerCount, localViewIndex);
+            console.log('getPLAYER',i,player,panel);
+        }
+    }
+
+    private testSetBaseTimeNotify():void{
+
+        const localViewIndex=3;
+        const baseWPos=this._factoryManager.getAreaCenterWorldPosition(localViewIndex);
+        const rotation=localViewIndex*-90;//--左下缺角需要逆時針旋轉
+        //const RoundNotifyBaseNode=this._roundTipNode.getComponent(PlayerPanel);
+        //this._roundTipNode.angle = rotation;
+        //this._roundTipNode.parent=this.node;
+        //this._roundTipNode.setWorldPosition(baseWPos);
+        this._roundTipNode.moveRoundNotifyBaseNode(baseWPos, localViewIndex);
+        this._roundTipNode.tweenColor();
+    }
+
     private async _testRotation(): Promise<void> {
         // ========== 先測試 getPlayerDestinationByIndex API ==========
         //this._testGetPlayerDestinationByIndexAPI();
         
         // ========== 然後繼續原有測試 ==========
         //this._factoryManager.testRotate(1);
-        const roomMaxPlayerCount = 4;
+        const roomMaxPlayerCount = 2;
         
-        this.setupRoomWithColorIndex(roomMaxPlayerCount, 3);
+        this.setupRoomWithColorIndex(roomMaxPlayerCount,3);
         //--new 20260504
-        this.initializeRoomManagerWithColorIndex(roomMaxPlayerCount, 3);
+        this.initializeRoomManagerWithColorIndex(roomMaxPlayerCount, 1);
      
         // 【調試】輸出座位和顏色的匹配結果
         //const roomManager = this.getRoomPlayerManager();
@@ -283,7 +348,7 @@ export class LudoGameManager extends Component {
             }
         }
         
-        const playerType = 3;
+        const playerType = 1;
         
         
         // 【調試】輸出該玩家的顏色
@@ -300,8 +365,33 @@ export class LudoGameManager extends Component {
             avatarSpriteFrame:null,//-玩家頭像圖片
         }
         //this._factoryManager.addPlayer(playerInfo,playerType);
-        this.addPlayer(playerInfo, playerType);
+        //this.addPlayer(playerInfo, playerType);//--單人
+        this.testAdjustSingleLayout(2);//--測試用，添加四個玩家
+        this.testSetBaseTimeNotify();//--測試回合提示
         await this.createRoomPawns();
+
+        //=========測試換顏色盤面後，API是否正確對應玩家視角==========
+        const viewTransformer = this._factoryManager.getViewTransformer();
+        const decorator = this._factoryManager.getMapDecorator();
+
+        for(let playerServerIndex=0;playerServerIndex<roomMaxPlayerCount;playerServerIndex++){
+            
+            const playerColor = this._roomPlayerManager.getSeatColor(playerServerIndex);
+            const playerLocalViewIndex = viewTransformer.getLocalViewIndex(playerServerIndex); 
+            if (playerLocalViewIndex === undefined || playerColor === undefined) {
+                continue;
+            }
+            
+            const node = decorator.getDecorationViewNodeByLocalViewIndex(
+                playerLocalViewIndex,
+                MarkerType.ARROW
+            );
+
+            const arrowComp=node?.getComponent(ArrowComp);
+            arrowComp?.setArrowSpriteFrameByColor(playerColor);
+            
+        }
+        //=========測試換顏色盤面後，API是否正確對應玩家視角==========
 
         // 測試1: 獲取玩家起點並繪製
         //const playerDes=this.getPlayerDestinationByIndex(playerType, 0, 0);
@@ -519,21 +609,6 @@ export class LudoGameManager extends Component {
 
     // ========== 視角旋轉 API ==========
     
-    /**
-     * <移動>
-     * 旋轉棋盤視角以適配當前玩家
-     * 
-     * 玩家位置映射：
-     * - 0: Blue (左下) → 0° (不旋轉)
-     * - 1: Red (左上) → 90°
-     * - 2: Green (右上) → 180°
-     * - 3: Yellow (右下) → 270°
-     * 
-     * @param playerIndex 當前玩家索引 (0:Blue左下, 1:Red左上, 2:Green右上, 3:Yellow右下)
-     */
-    public rotateBoardView(playerIndex: number): void {
-        this._factoryManager.rotateBoardView(playerIndex);
-    }
     
     /**
      * <移動>

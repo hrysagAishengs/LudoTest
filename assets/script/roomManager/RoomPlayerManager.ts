@@ -1,9 +1,12 @@
-import { instantiate, Vec3 } from "cc";
+import { Node, Vec3 } from "cc";
 import { IPlayerEntity, IPlayerIdentity, IPlayerStatus } from "../gamePlayer/def/PlayerDataDef";
 import { PlayerPanel } from "../gamePlayer/PlayerPanel";
-import { RoomConfigGroup } from "../factorySys/component/ConfigProperty";
+import { RoomConfigGroup, RoomPanelCreateMode } from "../factorySys/component/ConfigProperty";
 import { ColorSelector, PlayerColor } from "../gamePlayer/ColorSelector";
 import { IPawn } from "../gamePlayer/def/PawnDef";
+import { TableLayout } from "./TableLayout";
+import { IPlayerInfoPanel } from "../gamePlayer/def/PanelDef";
+
 
 /**
  * 房間玩家管理器
@@ -26,8 +29,13 @@ export class RoomPlayerManager {
     /** 座位到棋盤顏色的映射 (seatIndex → PlayerColor)，房間初始化時隨機分配 */
     private _seatColorMap: Map<number, PlayerColor> = new Map();
 
-    private _roomeMaxPlayerCount: number = 4;
+    private _roomMaxPlayerCount: number = 4;
 
+    private _tableLayout: TableLayout = new TableLayout();
+
+    get activePlayers(): Map<number, IPlayerEntity> {
+        return this._activePlayers;
+    }
     /**
      * 從配置初始化房間面板
      * @param roomConfigs - 房間配置數組
@@ -36,30 +44,19 @@ export class RoomPlayerManager {
     public initializeFromConfig(roomConfigs: RoomConfigGroup[], playerCount: number): void {
         
         const roomConfig = roomConfigs.find(config => config.playerCount === playerCount);
-        this._roomeMaxPlayerCount=playerCount;
+        this._roomMaxPlayerCount=playerCount;
 
         if (!roomConfig) {
             console.error(`RoomPlayerManager: missing room config for ${playerCount} players`);
             return;
         }
 
-        if (!roomConfig.playerPanelPrefab) {
-            console.error('RoomPlayerManager: playerPanelPrefab is not set');
+        if (!this._tableLayout.validateRoomConfig(roomConfig)) {
             return;
         }
 
-        if (!roomConfig.panelContainer) {
-            console.error('RoomPlayerManager: panelContainer is not set');
-            return;
-        }
-
-        if (!roomConfig.chairs || roomConfig.chairs.length === 0) {
-            console.error('RoomPlayerManager: chairs is empty');
-            return;
-        }
-
-        this._currentRoomConfig = roomConfig;
         this._clearPanels();
+        this._currentRoomConfig = roomConfig;
         this._seatColorMap = this._colorSelector.randomAssignColors(playerCount);
         console.log(`[RoomPlayerManager] seat colors assigned: ${this._getSeatColorSummary()}`);
         console.log(`RoomPlayerManager: room config ready for ${playerCount} players`);
@@ -74,29 +71,18 @@ export class RoomPlayerManager {
     public initializeWithColorIndex(roomConfigs: RoomConfigGroup[], playerCount: number, colorCombinationIndex: number): void {
         
         const roomConfig = roomConfigs.find(config => config.playerCount === playerCount);
-        this._roomeMaxPlayerCount = playerCount;
+        this._roomMaxPlayerCount = playerCount;
         if (!roomConfig) {
             console.error(`RoomPlayerManager: missing room config for ${playerCount} players`);
             return;
         }
 
-        if (!roomConfig.playerPanelPrefab) {
-            console.error('RoomPlayerManager: playerPanelPrefab is not set');
+        if (!this._tableLayout.validateRoomConfig(roomConfig)) {
             return;
         }
 
-        if (!roomConfig.panelContainer) {
-            console.error('RoomPlayerManager: panelContainer is not set');
-            return;
-        }
-
-        if (!roomConfig.chairs || roomConfig.chairs.length === 0) {
-            console.error('RoomPlayerManager: chairs is empty');
-            return;
-        }
-
-        this._currentRoomConfig = roomConfig;
         this._clearPanels();
+        this._currentRoomConfig = roomConfig;
 
         console.log('=== Color combination table ===');
         console.log('Index 0 (0 rotation):   [Blue, Red, Green, Yellow]');
@@ -107,8 +93,7 @@ export class RoomPlayerManager {
 
         console.log(`[RoomPlayerManager] use color combination index ${colorCombinationIndex}`);
         this._seatColorMap = this._colorSelector.assignColorsByIndex(playerCount, colorCombinationIndex);
-        console.log(`[RoomPlayerManager] seat colors assigned (test mode): ${this._getSeatColorSummary()}`);
-        console.log(`[RoomPlayerManager] room config ready for ${playerCount} players (test mode)`);
+
     }
 
     /**
@@ -116,12 +101,21 @@ export class RoomPlayerManager {
      * @private
      */
     private _clearPanels(): void {
+        const shouldDestroyPanelNode = !this.isSharedPanelContainerMode();
+        const destroyedNodes = new Set<Node>();
+
         this._activePlayers.forEach(player => {
-            if (player.panel && player.panel.node) {
-                player.panel.node.destroy();
+            player.panel?.clearView();
+
+            const panelNode = player.panel?.node;
+            if (shouldDestroyPanelNode && panelNode?.isValid && !destroyedNodes.has(panelNode)) {
+                destroyedNodes.add(panelNode);
+                this._tableLayout.destroyPlayerPanel(player.panel);
             }
         });
+
         this._activePlayers.clear();
+        this._tableLayout.clear();
     }
     
     /**
@@ -142,44 +136,13 @@ export class RoomPlayerManager {
      * @returns PlayerPanel 或 null
      * @private
      */
-    private createPlayerPanel(localViewIndex: number, isPlayerOwner: boolean): PlayerPanel | null {
-
-        const roomConfig = this._currentRoomConfig;
-        if (!roomConfig || !roomConfig.playerPanelPrefab || !roomConfig.panelContainer || !roomConfig.chairs) {
-            console.error('RoomPlayerManager: 無法建立玩家面板，尚未完成房間設定');
-            return null;
-        }
-
-        if (localViewIndex < 0 || localViewIndex > 3) {
-            console.error(`RoomPlayerManager: 無效的 localViewIndex: ${localViewIndex}`);
-            return null;
-        }
-
-        const chairIndex = this._roomeMaxPlayerCount === 2
-            ? (isPlayerOwner ? 0 : 1)
-            : localViewIndex;
-
-        if (chairIndex < 0 || chairIndex >= roomConfig.chairs.length) {
-            console.error(`RoomPlayerManager: 無效的 chairIndex: ${chairIndex}`);
-            return null;
-        }
-
-        const chairPos = roomConfig.chairs[chairIndex];
-        const panelNode = instantiate(roomConfig.playerPanelPrefab);
-        //panelNode.name = `PlayerPanel_${ColorSelector.getColorNameByEnum(playerColor)}`;
-        panelNode.name = 'PlayerPanel_'+localViewIndex;
-        panelNode.setParent(roomConfig.panelContainer);
-        panelNode.setPosition(new Vec3(chairPos.x, chairPos.y, 0));
-        panelNode.active = true;
-
-        const panel = panelNode.getComponent(PlayerPanel);
-        if (!panel) {
-            console.error(`RoomPlayerManager: localViewIndex ${localViewIndex} 缺少 PlayerPanel component`);
-            panelNode.destroy();
-            return null;
-        }
-
-        return panel;
+    private createPlayerPanel(localViewIndex: number, isPlayerOwner: boolean): IPlayerInfoPanel  | null {
+        return this._tableLayout.createPlayerPanel(
+            this._currentRoomConfig,
+            localViewIndex,
+            isPlayerOwner,
+            this._roomMaxPlayerCount
+        );
     }
     
     /**
@@ -193,9 +156,9 @@ export class RoomPlayerManager {
     /**
      * 獲取指定索引的面板
      * @param index - 面板索引
-     * @returns PlayerPanel 或 null
+     * @returns IPlayerInfoPanel 或 null
      */
-    public getPanel(index: number): PlayerPanel | null {
+    public getPanel(index: number): IPlayerInfoPanel  | null {
         return this._activePlayers.get(index)?.panel || null;
     }
 
@@ -303,7 +266,7 @@ export class RoomPlayerManager {
     public addPlayer(identity: IPlayerIdentity): void {
 
         const roomConfig = this._currentRoomConfig;
-        if (!roomConfig || !roomConfig.chairs) {
+        if (!roomConfig) {
             console.error('RoomPlayerManager: room config is not initialized');
             return;
         }
@@ -359,8 +322,8 @@ export class RoomPlayerManager {
         }
 
         player.panel.clearView();
-        if (player.panel.node) {
-            player.panel.node.destroy();
+        if (!this.isSharedPanelContainerMode() && player.panel.node?.isValid) {
+            this._tableLayout.destroyPlayerPanel(player.panel);
         }
 
         this._activePlayers.delete(seatIndex);
@@ -503,7 +466,7 @@ export class RoomPlayerManager {
 
         // 根據更新的字段調用對應的 UI 方法
         if (statusUpdate.money !== undefined) {
-            panel.updateMoney(statusUpdate.money);
+            panel.setPlayerMoney(statusUpdate.money);
         }
 
         if (statusUpdate.isCurrentTurn !== undefined) {
@@ -511,25 +474,29 @@ export class RoomPlayerManager {
         }
 
         if (statusUpdate.countdown !== undefined && statusUpdate.countdown > 0) {
-            panel.startCountdown(statusUpdate.countdown);
+            panel.playerHead.runCountdown(statusUpdate.countdown);
         } else if (statusUpdate.countdown === 0) {
-            panel.stopCountdown();
+            panel.playerHead.stopCountdown();
         }
 
         if (statusUpdate.diceResult !== undefined && statusUpdate.diceResult > 0) {
-            panel.showDiceResult(statusUpdate.diceResult);
+            panel.dicePanel.showDiceResult(statusUpdate.diceResult);
         }
 
         if (statusUpdate.isDiceRolling !== undefined && statusUpdate.isDiceRolling) {
-            panel.playDiceAnimation();
+            panel.dicePanel.playDiceAnim();
         }
-
+        /*
         if (statusUpdate.isAuto !== undefined) {
             panel.setAutoMode(statusUpdate.isAuto);
-        }
+        }*/
 
         if (statusUpdate.tipText !== undefined) {
             panel.showTip(statusUpdate.tipText);
         }
+    }
+
+    private isSharedPanelContainerMode(): boolean {
+        return this._currentRoomConfig?.panelCreateMode === RoomPanelCreateMode.SHARED_PANEL_CONTAINER;
     }
 }

@@ -2,6 +2,7 @@ import { SpriteFrame } from "cc";
 import { PlayerPanel } from "../PlayerPanel";
 import { PlayerColor } from "../ColorSelector";
 import { IPawn} from "./PawnDef";
+import { IPlayerInfoPanel } from "./PanelDef";
 
 /**
  * 玩家靜態身分
@@ -70,7 +71,7 @@ export interface IPlayerEntity {
     status: IPlayerStatus;
     
     /** UI 引用 (關鍵：直接操作面板) */
-    panel: PlayerPanel; 
+    panel: IPlayerInfoPanel; 
     
     // 4. 棋子實體 (之後邏輯會用到)
     pawns:Map<number,IPawn>;
