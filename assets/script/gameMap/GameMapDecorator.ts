@@ -37,6 +37,7 @@ export class GameMapDecorator {
 
     // 新資料流程使用的裝飾座標表。陣列 index 對應真實座位 index。
     private _decorationCoordMap: Map<DecorationType, [number, number][]> = new Map();
+    private _decorationViewNodeMap: Map<string, Node> = new Map();
     
     // 調試信息（用於日志輸出）
     private _baseColorRotation: number = 0;
@@ -117,6 +118,7 @@ export class GameMapDecorator {
      * 只移除 marker.icon，不刪除基本盤 marker 資料與格子狀態。
      */
     public clearDecorationViewNodes(): void {
+        this._decorationViewNodeMap.clear();
         const allGrids = this._mapCenter.getAllGrids();
         let clearCount = 0;
 
@@ -209,6 +211,7 @@ export class GameMapDecorator {
                     marker.icon = node;
                     marker.visualCoord = [visualR, visualC];
                     node.parent = visualGrid.containerNode;
+                    this.cacheDecorationViewNode(markerLocalViewIndex, marker.type, node);
                     renderCount++;
 
                     console.log(
@@ -260,7 +263,15 @@ export class GameMapDecorator {
      * 例如：localViewIndex=0 + MarkerType.ARROW 可取得左下視覺位置的箭頭節點。
      */
     public getDecorationViewNodeByLocalViewIndex(localViewIndex: number, markerType: MarkerType): Node | null {
-        return this.getDecorationMarkerByLocalViewIndex(localViewIndex, markerType)?.icon ?? null;
+        return this._decorationViewNodeMap.get(this.getDecorationViewNodeKey(localViewIndex, markerType)) ?? null;
+    }
+
+    private cacheDecorationViewNode(localViewIndex: number, markerType: MarkerType, node: Node): void {
+        this._decorationViewNodeMap.set(this.getDecorationViewNodeKey(localViewIndex, markerType), node);
+    }
+
+    private getDecorationViewNodeKey(localViewIndex: number, markerType: MarkerType): string {
+        return `${localViewIndex}:${markerType}`;
     }
 
     /**

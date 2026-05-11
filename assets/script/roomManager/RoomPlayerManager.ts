@@ -428,7 +428,7 @@ export class RoomPlayerManager {
      */
     public createInitialStatus(): IPlayerStatus {
         return {
-            money: 1000,            // 初始金錢
+            money: 0,            // 初始金錢
             isCurrentTurn: false,   // 不是當前回合
             countdown: 0,           // 倒計時 0
             diceResult: 0,          // 骰子結果 0

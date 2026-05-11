@@ -197,7 +197,7 @@ export class LudoGameManager extends Component {
         const fake2PIndex = this.getFake2PIndex(seatIndex);
 
         identity.seatIndex = seatIndex;
-        identity.playIndex = this._roomMaxPlayerCount === 2 ? fake2PIndex : -1;
+        identity.playIndex =fake2PIndex;
         identity.localViewIndex = viewTransformer.getLocalViewIndex(fake2PIndex);
         identity.isPlayerOwner = viewTransformer.isCurrentPlayerView(seatIndex);
 
@@ -348,7 +348,7 @@ export class LudoGameManager extends Component {
             }
         }
         
-        const playerType = 1;
+        const playerType = 0;
         
         
         // 【調試】輸出該玩家的顏色

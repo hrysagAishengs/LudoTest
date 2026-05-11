@@ -12,9 +12,8 @@ import { IViewTransformer } from "../../defs/path/PathFactoryDef";
 export class BasicViewTransformer implements IViewTransformer {
     
     private readonly BOARD_MAX_INDEX = 14; // 15x15 棋盤的最大索引
-    private _pathMap: Record<number, number[][]> | null = null;
+    private _pathMap: Record<number, number[][]> | null = null;//--即將刪除20260511
     private _originalPathMap: Record<number, number[][]> | null = null;  // 存儲原始路徑（未重映射）
-    //private _originalPathMapOld: Record<number, number[][]> | null = null;  //  存儲舊的原始路徑（未重映射）
     private _baseMap: Record<number, number[][]> | null = null;
     private _originalBaseMap: Record<number, number[][]> | null = null;  // 存儲原始基地（未重映射）
     private _slotIdMap: Record<number, number[]> | null = null;  // 存儲每個玩家的 SlotID 陣列
@@ -26,15 +25,19 @@ export class BasicViewTransformer implements IViewTransformer {
     //--new
     private _dataRotationSteps :number=0;//數據旋轉次數（0-3，用於根據玩家視角轉換路徑和基地座標）
     private _currentPlayerView:number=-1;// 當前玩家座位（座位索引，0-3），由 setupLocalPlayerView 设置，用于路径转换方法中正确处理旋转
+    //--20260511 NEW 快速查表O(1),舊版查詢方法是 O(n-->_originalPathMap.length)
+    private _originalPathCoordIndexMap: Map<string, number> = new Map();
+    
     /**
      * 設置路徑內容
+     * @deprecated 20260511 此方法將被廢棄，
+     * 因為將直接使用原始路徑來進行視角轉換，
+     * 而不是在這裡維護一份重映射的路徑數據。
      * @param pathMap 所有玩家的路徑映射
      */
     public setPathContent(pathMap: Record<number, number[][]>): void {
         this._pathMap = pathMap;
-       
         console.log('[BasicViewTransformer.setPathContent] _pathMap已更新：',this._pathMap);
-        
     }
 
     /**
@@ -43,6 +46,7 @@ export class BasicViewTransformer implements IViewTransformer {
      */
     public setOriginalPathContent(originalPathMap: Record<number, number[][]>): void {
         this._originalPathMap = originalPathMap;
+        this.rebuildOriginalPathCoordIndexMap();
         console.log('[BasicViewTransformer.setOriginalPathContent] _originalPathMap已更新：',this._originalPathMap);
     }
 
@@ -250,19 +254,57 @@ export class BasicViewTransformer implements IViewTransformer {
         return this.getPathCoordInViewByStartIndex(chairId, startIndex, steps);
     }
 
+    private rebuildOriginalPathCoordIndexMap(): void {
+        
+        this._originalPathCoordIndexMap.clear();
 
+        if (!this._originalPathMap) {
+            return;
+        }
 
+        for (const chairIdText in this._originalPathMap) {
+            const chairId = Number(chairIdText);
+            const path = this._originalPathMap[chairId];
+
+            if (!path) {
+                continue;
+            }
+
+            for (let index = 0; index < path.length; index++) {
+                const coord = path[index];
+                if (!coord || coord.length < 2) {
+                    continue;
+                }
+
+                const [r, c] = coord;
+                this._originalPathCoordIndexMap.set(this.getPathCoordIndexKey(chairId, r, c), index);
+            }
+        }
+    }
+
+    
+    private getPathCoordIndexKey(chairId: number, row: number, col: number): string {
+        return `${chairId}:${row}:${col}`;
+    }
+
+    /**
+     * NEW 20260511: 根據位置查表獲取路徑索引
+     * @param chairId 
+     * @param startPos 
+     * @returns 
+     */
     private getIndexFormPathMapByPos(chairId:number,startPos: [number, number]):number {
         
-        const currentPath = this._originalPathMap?.[chairId];
-        if(!currentPath) {
-            console.error(`[getIndexFormPathMapByPos] chairId ${chairId} 的路徑數據不存在`);
+        if (!this._originalPathMap?.[chairId]) {
+            console.error(`[getIndexFormPathMapByPos] chairId ${chairId} 的原始路徑數據不存在`);
             return -1;
         }
-        const index = currentPath.findIndex(([r, c]) => r === startPos[0] && c === startPos[1]);
-        
-        return index;
+
+        return this._originalPathCoordIndexMap.get(
+            this.getPathCoordIndexKey(chairId, startPos[0], startPos[1])
+        ) ?? -1;
     }
+   
 
     public getPathSegmentInViewByPos(chairId:number,startPos: [number, number], steps: number): [number, number][] | null {
         
@@ -340,17 +382,7 @@ export class BasicViewTransformer implements IViewTransformer {
      * @returns 目標座標，如果超出路徑返回 null
      */
     public getPlayerMoveDestForm(chairId:number, startIndex:number, steps:number):[number,number] | null {
-        
         return this.getPathCoordInViewByStartIndex(chairId, startIndex, steps);
-        //const isPlayerView = this.isCurrentPlayerView(chairId);
-        
-        /*
-        if (isPlayerView) {
-            return this.getDestinationByStartIndex(chairId, startIndex, steps);
-        }else{
-            const otherPlayerIndex = this.getLocalViewIndex(chairId);
-            return this.getOtherPlayerDestToGlobal(chairId, otherPlayerIndex, startIndex, steps);
-        }*/
     }
 
     
@@ -660,321 +692,24 @@ export class BasicViewTransformer implements IViewTransformer {
     }
 
     //=========================即將刪除區域==============================================
-    /**
-     * 獲取從起點到終點的完整路徑段（基於起點索引）
-     *
-     * @deprecated 即將刪除，請改用 getPathSegmentInViewByStartIndex。
+     /**
+     * @deprecated 20260511 此方法將被廢棄，
+     * 因為將用_originalPathCoordIndexMap來直接查表獲取位置索引(0(1)時間複雜度)，
+     * 舊方法是查表_originalPathMap (0(length)時間複雜度)
      * 
-     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @param startIndex 起點索引（在該玩家路徑陣列中的索引位置）
-     * @param steps 移動步數
-     * @returns 路徑段陣列（包含起點和終點，均為玩家視角下的座標），如果超出路徑返回 null
+     * @param chairId 
+     * @param startPos 
+     * @returns 
      */
-    public getPathSegmentByStartIndex(playerView: number, startIndex: number, steps: number): number[][] | null {
+    private getIndexFormPathMapByPosOLD(chairId:number,startPos: [number, number]):number {
         
-        const basePath = this._pathMap?.[playerView];
-        if (!basePath) return null;
-
-        const endIndex = startIndex + steps;
-        if (endIndex < 0 || endIndex >= basePath.length) return null;
-
-        const baseSegment = basePath.slice(startIndex, endIndex + 1);
-        // 🔧 修復（2026-05-02）：转换路径段中的每个点为视觉坐标
-        const visualSegment = baseSegment.map(coord => 
-            this.baseToPlayerView(coord[0], coord[1], playerView)
-        );
-        return visualSegment;
-    }
-
-    // ========== 多玩家視角轉換 ==========
-
-    /**
-     * 計算其他玩家從指定索引移動後的終點位置（返回當前玩家視角下的座標）
-     *
-     * @deprecated 即將刪除，請改用 getPathCoordInViewByStartIndex。
-     * 
-     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @param otherPlayer 在當前玩家視角下的其他玩家相對位置 (0:左下, 1:左上, 2:右上, 3:右下)
-     * @param startIndex 其他玩家在**基本盤路徑**上的起點索引
-     * @param steps 移動步數
-     * @returns 終點位置 [row, col]（當前玩家視角下的座標），如果超出路徑返回 null
-     * 示例：黃色玩家(3)視角下，查看左上角玩家(1=藍色)從索引5移動3步的終點
-     *      返回在黃色玩家視角下看到的藍色玩家的終點座標
-     */
-    public getOtherPlayerDestToGlobal(
-        playerView: number,
-        otherPlayer: number,//--旋轉後的相對位置（0:左下, 1:左上, 2:右上, 3:右下）
-        startIndex: number,
-        steps: number
-    ): [number, number] | null {
-        // 🔧 核心修復（2026-05-02）：使用標準視覺路徑，而不是重映射路徑
-        // 
-        // otherPlayer 代表**固定視覺位置**（相對於視覺原點），不是實際座位
-        // 標準視覺布局（固定映射到原始顏色）：
-        //   otherPlayer=0 → 原始 Blue(0)  - 視覺左下角
-        //   otherPlayer=1 → 原始 Yellow(3) - 視覺左上角
-        //   otherPlayer=2 → 原始 Green(2)  - 視覺右上角
-        //   otherPlayer=3 → 原始 Red(1)    - 視覺右下角
-        
-        if (!this._originalPathMap) {
-            console.error('[getOtherPlayerDestToGlobal] 原始路徑未設置');
-            return null;
+        const currentPath = this._originalPathMap?.[chairId];
+        if(!currentPath) {
+            console.error(`[getIndexFormPathMapByPos] chairId ${chairId} 的路徑數據不存在`);
+            return -1;
         }
+        const index = currentPath.findIndex(([r, c]) => r === startPos[0] && c === startPos[1]);
         
-        // 視覺位置到原始顏色的固定映射
-        const VISUAL_TO_ORIGINAL_COLOR = [0, 3, 2, 1];
-        const originalColor = VISUAL_TO_ORIGINAL_COLOR[otherPlayer];
-        
-        // 查詢原始標準路徑（而非重映射路徑）
-        const originalPath = this._originalPathMap[originalColor];
-        if (!originalPath) return null;
-
-        const endIndex = startIndex + steps;
-        if (endIndex < 0 || endIndex >= originalPath.length) return null;
-
-        const baseCoord = originalPath[endIndex];
-        
-        // 🔧 關鍵修復（2026-05-02 最終版）：直接返回基本盤坐標，不旋轉！
-        // 
-        // 原因：setupLocalPlayerView 已經旋轉了整個棋盤底圖和 UI
-        // 坐標系統（如 getCellPosition）會自動根據旋轉後的棋盤位置返回正確的屏幕位置
-        // 
-        // 如果這裡再旋轉一次，就會導致雙重旋轉錯誤：
-        // - playerView=0: 不旋轉 ✓
-        // - playerView=1: 旋轉1次 → 錯誤（棋盤已經旋轉過了）✗
-        // 
-        // 正確做法：返回基本盤坐標，讓底層坐標系統自動處理
-        const testVisualCoord = this.getPathCoordInViewByStartIndex(playerView, startIndex, steps);
-        console.log();
-        return [baseCoord[0], baseCoord[1]];
-    }
-
-    /**
-     * 計算其他玩家從指定索引移動後的路徑段（返回當前玩家視角下的座標）
-     *
-     * @deprecated 即將刪除，請改用 getPathSegmentInViewByStartIndex。
-     * 
-     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @param otherPlayer 在當前玩家視角下的其他玩家相對位置 (0:左下, 1:左上, 2:右上, 3:右下)
-     * @param startIndex 其他玩家在**基本盤路徑**上的起點索引
-     * @param steps 移動步數
-     * @returns 路徑段陣列（包含起點和終點，均為當前玩家視角下的座標），如果超出路徑返回 null
-     */
-    public getOtherPlayerDestToGlobalSegment(
-        playerView: number,
-        otherPlayer: number,
-        startIndex: number,
-        steps: number
-    ): number[][] | null {
-        // 🔧 核心修復：使用標準視覺路徑
-        if (!this._originalPathMap) {
-            console.error('[getOtherPlayerDestToGlobalSegment] 原始路徑未設置');
-            return null;
-        }
-        
-        // 視覺位置到原始顏色的固定映射
-        const VISUAL_TO_ORIGINAL_COLOR = [0, 3, 2, 1];
-        const originalColor = VISUAL_TO_ORIGINAL_COLOR[otherPlayer];
-        
-        // 查詢原始標準路徑
-        const originalPath = this._originalPathMap[originalColor];
-        if (!originalPath) return null;
-
-        const endIndex = startIndex + steps;
-        if (endIndex < 0 || endIndex >= originalPath.length) return null;
-
-        const baseSegment = originalPath.slice(startIndex, endIndex + 1);
-        
-        // 🔧 關鍵修復（2026-05-02 最終版）：直接返回基本盤坐標，不旋轉！
-        // 原因同 getOtherPlayerDestToGlobal：setupLocalPlayerView 已旋轉棋盤
-        return baseSegment.map(([r, c]) => [r, c]);
-    }
-
-    // ========== 基於位置的路徑計算 ==========
-
-    /**
-     * 計算從起點位置移動指定步數後的終點位置
-     *
-     * @deprecated 即將刪除，請改用 getPathCoordInViewByPos。
-     * 
-     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @param startPos 起點位置 [row, col]（玩家視角下的座標）
-     * @param steps 移動步數
-     * @returns 終點位置 [row, col]（玩家視角下的座標），如果超出路徑返回 null
-     */
-    public getDestinationByPos(playerView: number, startPos: [number, number], steps: number): [number, number] | null {
-        // 獲取該玩家在基本盤的路徑
-        const basePath = this._pathMap?.[playerView];
-        if (!basePath) return null;
-
-        // 將玩家視角下的座標轉回基本盤座標
-        const baseStartPos = this.playerViewToBase(startPos[0], startPos[1], playerView);
-        
-        // 在基本盤路徑中找到起點索引
-        const startIndex = basePath.findIndex(([r, c]) => r === baseStartPos[0] && c === baseStartPos[1]);
-        if (startIndex === -1) return null; // 起點不在路徑中
-
-        // 計算終點索引
-        const endIndex = startIndex + steps;
-        if (endIndex < 0 || endIndex >= basePath.length) return null; // 超出路徑範圍
-
-        // 獲取基本盤的終點座標
-        const baseEndPos = basePath[endIndex];
-        
-        // 🔧 修復：查詢自己的路徑不需要旋轉
-        return [baseEndPos[0], baseEndPos[1]];
-    }
-
-    /**
-     * 獲取從起點到終點的完整路徑段（基於起點位置）
-     *
-     * @deprecated 即將刪除，請改用 getPathSegmentInViewByPos。
-     * 
-     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @param startPos 起點位置 [row, col]（玩家視角下的座標）
-     * @param steps 移動步數
-     * @returns 路徑段陣列（包含起點和終點，均為玩家視角下的座標），如果超出路徑返回 null
-     */
-    public getPathSegmentByPos(playerView: number, startPos: [number, number], steps: number): number[][] | null {
-        // 獲取該玩家在基本盤的路徑
-        const basePath = this._pathMap?.[playerView];
-        if (!basePath) return null;
-
-        // 將玩家視角下的座標轉回基本盤座標
-        const baseStartPos = this.playerViewToBase(startPos[0], startPos[1], playerView);
-        
-        // 在基本盤路徑中找到起點索引
-        const startIndex = basePath.findIndex(([r, c]) => r === baseStartPos[0] && c === baseStartPos[1]);
-        if (startIndex === -1) return null; // 起點不在路徑中
-
-        // 計算終點索引
-        const endIndex = startIndex + steps;
-        if (endIndex < 0 || endIndex >= basePath.length) return null; // 超出路徑範圍
-
-        // 獲取基本盤的路徑段
-        const baseSegment = basePath.slice(startIndex, endIndex + 1);
-        
-        // 🔧 修復：查詢自己的路徑不需要旋轉，直接返回基本盤座標
-        return baseSegment;
-    }
-
-    // ========== 基於索引的路徑計算 ==========
-
-    /**
-     * 計算從起點索引移動指定步數後的終點位置
-     *
-     * @deprecated 即將刪除，請改用 getPathCoordInViewByStartIndex。
-     * 
-     * @param playerView 當前玩家視角 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @param startIndex 起點索引（在該玩家路徑陣列中的索引位置）
-     * @param steps 移動步數
-     * @returns 終點位置 [row, col]（玩家視角下的座標），如果超出路徑返回 null
-     */
-    public getDestinationByStartIndex(playerView: number, startIndex: number, steps: number): [number, number] | null {
-        
-        const basePath = this._pathMap?.[playerView];
-        if (!basePath) {
-            console.log(`[getDestinationByStartIndex] pathMap[${playerView}] 不存在`);
-            return null;
-        }
-
-        const endIndex = startIndex + steps;
-        if (endIndex < 0 || endIndex >= basePath.length) {
-            console.log(`[getDestinationByStartIndex] endIndex=${endIndex} 越界`);
-            return null;
-        }
-
-        const baseEndPos = basePath[endIndex];
-        console.log(`[getDestinationByStartIndex] 基本盘坐标 basePath[${endIndex}] = [${baseEndPos[0]}, ${baseEndPos[1]}]`);
-        
-        // 🔧 修復（2026-05-02）：转换为视觉坐标后返回
-        // 使用 baseToPlayerView 转换，确保与 getOtherPlayerDestToGlobal 的逻辑隔离
-        const visualCoord = this.baseToPlayerView(baseEndPos[0], baseEndPos[1], playerView);
-        console.log(`[getDestinationByStartIndex] 转换为视觉坐标: [${visualCoord[0]}, ${visualCoord[1]}]`);
-        const testVisualCoord = this.getPathCoordInViewByStartIndex(playerView, startIndex, steps);
-        return visualCoord;
-    }
-
-      /**
-     * 從基地坑位基本盤座標轉換到指定玩家視角的座標
-     *
-     * @deprecated 即將刪除，基地坑位請改用 getPlayerBaseBySlotIndex / getPlayerBaseBySlotId / getPlayerBaseList。
-     * 專門用於基地坑位的視角轉換（與路徑轉換邏輯不同）
-     * 
-     * 基地坑位使用區塊平移生成，需要特殊的視角轉換邏輯：
-     * 1. 計算坑位在其所屬區塊內的相對位置
-     * 2. 應用區塊級旋轉
-     * 3. 轉換到目標區塊的絕對座標
-     * 
-     * 基本盤坐標順序（左上、右上、左下、右下）：
-     * - Blue(0):   [3,1], [3,3], [1,1], [1,3]    -> slotId -1~-4
-     * - Red(1):    [12,1], [12,3], [10,1], [10,3] -> slotId -5~-8
-     * - Green(2):  [12,10], [12,12], [10,10], [10,12] -> slotId -9~-12
-     * - Yellow(3): [3,10], [3,12], [1,10], [1,12]  -> slotId -13~-16
-     * 
-     * 範例：在 Yellow(3) 視角下，Red 的坑位轉換為：
-     * - [12,1] -> [12,12], [12,3] -> [10,12], [10,1] -> [12,10], [10,3] -> [10,10]
-     * 
-     * @param row 基本盤的 row 座標
-     * @param col 基本盤的 col 座標
-     * @param currentPlayer 當前在左下角的玩家 (0:Blue, 1:Red, 2:Green, 3:Yellow)
-     * @returns 轉換後的座標 [row, col]
-     */
-    public baseSlotToPlayerView(row: number, col: number, currentPlayer: number): [number, number] {
-        // 確定該坐標屬於哪個玩家的區塊
-        let ownerPlayer = -1;
-        const blockSize = 2; // 每個區塊是 3x3，但坐標範圍是 0-2
-        const baseMin = 1;   // Blue 區塊左下角 [1,1]
-        const blockOffset = 9; // 區塊間距
-        
-        // 判斷屬於哪個玩家的區塊
-        if (row >= baseMin && row <= baseMin + blockSize && col >= baseMin && col <= baseMin + blockSize) {
-            ownerPlayer = 0; // Blue
-        } else if (row >= baseMin + blockOffset && row <= baseMin + blockOffset + blockSize && col >= baseMin && col <= baseMin + blockSize) {
-            ownerPlayer = 1; // Red
-        } else if (row >= baseMin + blockOffset && row <= baseMin + blockOffset + blockSize && col >= baseMin + blockOffset && col <= baseMin + blockOffset + blockSize) {
-            ownerPlayer = 2; // Green
-        } else if (row >= baseMin && row <= baseMin + blockSize && col >= baseMin + blockOffset && col <= baseMin + blockOffset + blockSize) {
-            ownerPlayer = 3; // Yellow
-        }
-        
-        if (ownerPlayer === -1) return [row, col]; // 無法識別，返回原座標
-        
-        // 計算該玩家在基本盤上的區塊基準點
-        let blockBaseRow = baseMin;
-        let blockBaseCol = baseMin;
-        if (ownerPlayer === 1) blockBaseRow += blockOffset; // Red
-        if (ownerPlayer === 2) { blockBaseRow += blockOffset; blockBaseCol += blockOffset; } // Green
-        if (ownerPlayer === 3) blockBaseCol += blockOffset; // Yellow
-        
-        // 轉換為相對坐標
-        let relRow = row - blockBaseRow;
-        let relCol = col - blockBaseCol;
-        
-        // 計算需要旋轉的次數（逆時針）
-        const rotations = (4 - currentPlayer) % 4;
-        
-        // 應用旋轉（每次順時針 90 度，在相對坐標系統中）
-        for (let i = 0; i < rotations; i++) {
-            // 順時針 90 度: (r,c) → (blockSize-c, r)
-            const temp = relRow;
-            relRow = blockSize - relCol;
-            relCol = temp;
-        }
-        
-        // 計算目標玩家在視角轉換後的區塊位置
-        // ownerPlayer 在基本盤的位置 -> 旋轉後的位置
-        // 逆時針旋轉：position - currentPlayer
-        const targetPlayer = (ownerPlayer - currentPlayer + 4) % 4;
-        
-        // 計算目標區塊的基準點
-        let targetBlockRow = baseMin;
-        let targetBlockCol = baseMin;
-        if (targetPlayer === 1) targetBlockRow += blockOffset; // Red position
-        if (targetPlayer === 2) { targetBlockRow += blockOffset; targetBlockCol += blockOffset; } // Green position
-        if (targetPlayer === 3) targetBlockCol += blockOffset; // Yellow position
-        
-        // 轉回絕對坐標
-        return [targetBlockRow + relRow, targetBlockCol + relCol];
+        return index;
     }
 }

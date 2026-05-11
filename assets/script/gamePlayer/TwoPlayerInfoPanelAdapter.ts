@@ -127,7 +127,7 @@ export class TwoPlayerInfoPanelAdapter implements IPlayerInfoPanel {
         this.playerHead.cleanCountdown();
         this.playerHead.resetShader();
         this.timeNotifyCountLight.reset();
-        this.dicePanel.reset();
+        //--共同持有dice所以清除的責任交給上層TwoPlayerBottomPanel
     }
 
     public setPlayerName(name: string): void {

@@ -88,6 +88,7 @@ export interface IViewTransformer {
      */
     getRealIndexFromView(viewIndex: number): number;
     /**
+     * @deprecated 20260511 此方法將被廢棄
      * 設定路徑內容
      * 必須在使用轉換功能前調用
      * @param pathMap 所有玩家的路徑映射
@@ -96,7 +97,7 @@ export interface IViewTransformer {
     
     /**
      *  設定原始路徑內容（未重映射的標準路徑）
-     * 用於 getOtherPlayerDestToGlobal 等方法，保證視覺一致性
+     * 
      * @param originalPathMap 原始路徑映射 (0:Blue, 1:Red, 2:Green, 3:Yellow)
      */
     setOriginalPathContent(originalPathMap: Record<number, number[][]>): void;

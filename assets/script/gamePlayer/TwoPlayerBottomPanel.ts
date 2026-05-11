@@ -31,8 +31,11 @@ export class TwoPlayerBottomPanel extends Component {
     @property({ type: DicePanel, tooltip: 'Shared center dice panel', visible: true, displayName: 'CenterDicePanel' })
     private _centerDicePanel: DicePanel = null;
 
-    @property({ type: TimeNotifyCountLight, tooltip: 'Shared time notify count light', visible: true, displayName: 'TimeNotifyCountLight' })
-    private _timeNotifyCountLight: TimeNotifyCountLight = null;
+    @property({ type: TimeNotifyCountLight, tooltip: 'time notify count light_L_side', visible: true, displayName: 'TimeNotifyCountLight_L' })
+    private _timeNotifyCountLight_L: TimeNotifyCountLight = null;
+
+    @property({ type: TimeNotifyCountLight, tooltip: 'time notify count light_R_side', visible: true, displayName: 'TimeNotifyCountLight_R' })
+    private _timeNotifyCountLight_R: TimeNotifyCountLight = null;
 
     private _leftAdapter: TwoPlayerInfoPanelAdapter | null = null;
     private _rightAdapter: TwoPlayerInfoPanelAdapter | null = null;
@@ -48,7 +51,7 @@ export class TwoPlayerBottomPanel extends Component {
                 sidePanel: this._leftInfoPanel,
                 playerHead: this._leftPlayerHead,
                 dicePanel: this._centerDicePanel,
-                timeNotifyCountLight: this._timeNotifyCountLight,
+                timeNotifyCountLight: this._timeNotifyCountLight_L,
             });
         }
 
@@ -57,7 +60,7 @@ export class TwoPlayerBottomPanel extends Component {
                 sidePanel: this._rightInfoPanel,
                 playerHead: this._rightPlayerHead,
                 dicePanel: this._centerDicePanel,
-                timeNotifyCountLight: this._timeNotifyCountLight,
+                timeNotifyCountLight: this._timeNotifyCountLight_R,
             });
         }
     }
@@ -94,10 +97,14 @@ export class TwoPlayerBottomPanel extends Component {
         this._rightAdapter?.showAll();
     }
 
+    /**
+     * dicePanel的重置責任交給TwoPlayerBottomPanel，因為它是兩邊共用的
+     */
     public clearView(): void {
         this.ensureAdapters();
         this._leftAdapter?.clearView();
         this._rightAdapter?.clearView();
+        this._centerDicePanel?.reset();
     }
 
     private ensureAdapters(): void {
