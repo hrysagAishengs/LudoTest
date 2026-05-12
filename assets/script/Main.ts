@@ -1,4 +1,4 @@
-import { _decorator, Component, Node } from 'cc';
+import { _decorator, Component, instantiate, Node, Prefab } from 'cc';
 import { LudoGameManager } from './LudoGameManager';
 import { LudoGameMode } from './gameDef/GameDef';
 import { IRollData, SimpleSlot } from './simpleSlot/SimpleSlot';
@@ -28,14 +28,22 @@ export class Main extends Component {
     @property({type:TestShader_OG,displayName:"測試用Shader",tooltip:"用於測試的Shader組件",visible:true})
     private _testShader_OG: TestShader_OG = null!;
 
+    @property({type:Prefab,displayName:"測試用節點",tooltip:"用於測試的節點",visible:true})
+    private _testPrefab: Prefab = null!;
+
     start() {
         
         this.initGame();
     }
 
     public async testBtn():Promise<void>{
+        
+        const testNode=instantiate(this._testPrefab);
+        this.node.addChild(testNode);
+        
         // 測試按鈕觸發的邏輯
-        this._testRectBoardFillLine.playProgressTween(1, 1, 0);//無->有
+        
+        //this._testRectBoardFillLine.playProgressTween(1, 1, 0);//無->有
         //this._testShader.playProgressTween(1, 1, 0);//無->有
         //this._testShader.playProgressTween(1, 0, 1);//無->有
         //this._testShader_OG.playProgressTween(1, 1, 0);//-有->無

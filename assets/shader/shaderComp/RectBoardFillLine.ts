@@ -115,6 +115,13 @@ export class RectBoardFillLine extends Component {
     })
     direction: number = 0;
 
+    @property({
+        displayName: "初始進度",
+        slide: true,
+        range: [0, 1, 0.01]
+    })
+    progress: number = 0;
+
 
     private _material: Material = null!;
     private _spriteInfo: Vec4 = new Vec4();
@@ -194,6 +201,7 @@ export class RectBoardFillLine extends Component {
         this._material.setProperty('colorProgressMode', this.colorProgressMode);
         this._material.setProperty('useColorBlend', this.useColorBlend);
         this._material.setProperty('direction', this.direction);
+        this._material.setProperty('progress', this.progress);
     }
 
     private ensureMaterial(): void {
