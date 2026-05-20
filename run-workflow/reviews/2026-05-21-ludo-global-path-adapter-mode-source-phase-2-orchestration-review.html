@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ludo Global Path Adapter Mode Source Phase 2 Orchestration Review</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f7f7f4;
+      --panel: #ffffff;
+      --text: #202124;
+      --muted: #666b72;
+      --line: #d7d9de;
+      --accent: #0f766e;
+      --code-bg: #f0f2f4;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #181a1b;
+        --panel: #202326;
+        --text: #eceff1;
+        --muted: #a3aab2;
+        --line: #3b4148;
+        --accent: #5eead4;
+        --code-bg: #141719;
+      }
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.58;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+      padding: 20px 28px;
+    }
+    header h1 {
+      margin: 0 0 8px;
+      font-size: 26px;
+      letter-spacing: 0;
+    }
+    header p {
+      margin: 2px 0;
+      color: var(--muted);
+      font-size: 13px;
+      word-break: break-all;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+      gap: 24px;
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    nav {
+      position: sticky;
+      top: 16px;
+      align-self: start;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      max-height: calc(100vh - 48px);
+      overflow: auto;
+    }
+    nav h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    nav ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    nav li {
+      margin: 6px 0;
+      font-size: 14px;
+    }
+    nav li.level-2 { padding-left: 10px; }
+    nav li.level-3, nav li.level-4, nav li.level-5, nav li.level-6 { padding-left: 20px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    main {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 28px;
+      min-width: 0;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+      margin-bottom: 0.55em;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+    h1:first-child, h2:first-child { margin-top: 0; }
+    code {
+      background: var(--code-bg);
+      border-radius: 4px;
+      padding: 2px 5px;
+      font-family: Consolas, "Courier New", monospace;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: auto;
+      padding: 14px;
+    }
+    pre code {
+      background: transparent;
+      padding: 0;
+    }
+    blockquote {
+      border-left: 4px solid var(--accent);
+      margin-left: 0;
+      padding: 8px 14px;
+      color: var(--muted);
+      background: var(--code-bg);
+    }
+    @media (max-width: 860px) {
+      .layout {
+        grid-template-columns: 1fr;
+        padding: 16px;
+      }
+      nav {
+        position: static;
+        max-height: none;
+      }
+      main {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Ludo Global Path Adapter Mode Source Phase 2 Orchestration Review</h1>
+    <p>Source: D:\cocosTest\ludo\LUDO\assets\script\tsak\ai-workflow\reviews\2026-05-21-ludo-global-path-adapter-mode-source-phase-2-orchestration-review.md</p>
+    <p>Generated: 2026-05-21 02:06:37</p>
+  </header>
+  <div class="layout">
+    <nav>
+      <h2>Sections</h2>
+      <ul>
+        <li class="level-1"><a href="#ludo-global-path-adapter-mode-source-phase-2-orchestration-review">Ludo Global Path Adapter Mode Source Phase 2 Orchestration Review</a></li>
+<li class="level-2"><a href="#current-workflow-mode">Current Workflow Mode</a></li>
+<li class="level-2"><a href="#current-phase">Current Phase</a></li>
+<li class="level-2"><a href="#execution-status">Execution Status</a></li>
+<li class="level-2"><a href="#search-evidence">Search Evidence</a></li>
+<li class="level-2"><a href="#ownership-review">Ownership Review</a></li>
+<li class="level-3"><a href="#which-object-owns-game-mode-setup">Which object owns game mode setup?</a></li>
+<li class="level-3"><a href="#which-object-detects-open-gate">Which object detects OPEN GATE?</a></li>
+<li class="level-3"><a href="#which-object-detects-game-end-or-table-change">Which object detects game end or table change?</a></li>
+<li class="level-2"><a href="#adapter-ownership-gap">Adapter Ownership Gap</a></li>
+<li class="level-2"><a href="#integration-recommendation">Integration Recommendation</a></li>
+<li class="level-2"><a href="#files-changed-in-this-phase">Files Changed In This Phase</a></li>
+<li class="level-2"><a href="#verification-evidence">Verification Evidence</a></li>
+<li class="level-2"><a href="#remaining-risk">Remaining Risk</a></li>
+<li class="level-2"><a href="#blocking-issue">Blocking Issue</a></li>
+<li class="level-2"><a href="#next-available-actions">Next Available Actions</a></li>
+<li class="level-2"><a href="#recommended-next-step">Recommended Next Step</a></li>
+      </ul>
+    </nav>
+    <main>
+      <h1 id="ludo-global-path-adapter-mode-source-phase-2-orchestration-review">Ludo Global Path Adapter Mode Source Phase 2 Orchestration Review</h1>
+
+<h2 id="current-workflow-mode">Current Workflow Mode</h2>
+
+<p>STANDARD</p>
+
+<h2 id="current-phase">Current Phase</h2>
+
+<p>Phase 2 external orchestration review.</p>
+
+<h2 id="execution-status">Execution Status</h2>
+
+<p>Review-only phase completed. No production code was changed in this phase.</p>
+
+<h2 id="search-evidence">Search Evidence</h2>
+
+<p>Adapter and resolver search:</p>
+
+<pre><code>rg &quot;new LudoGlobalPathAdapter|LudoGlobalPathAdapter|LudoPathViewResolver&quot; -n &quot;D:\cocosTest\ludo\LUDO\assets\script&quot;</code></pre>
+
+<p>Result summary:</p>
+
+<ul>
+<li><code>LudoGlobalPathAdapter</code> exists at <code>assets/script/pathAdapter/LudoGlobalPathAdapter.ts</code>.</li>
+<li><code>LudoPathViewResolver</code> imports <code>LudoGlobalPathAdapter</code>.</li>
+<li>No production construction site was found for <code>new LudoGlobalPathAdapter</code>.</li>
+<li>No production construction site was found for <code>new LudoPathViewResolver</code>.</li>
+<li>Current hits outside those files are workflow docs created for this task.</li>
+</ul>
+
+<p>Game mode and room lifecycle search:</p>
+
+<pre><code>rg &quot;OPEN GATE|OpenGate|openGate|gate|Gate|setGameMode\(|getCurrentGameMode|initGameMode|reset.*Game|table|Table|room|Room&quot; -n &quot;D:\cocosTest\ludo\LUDO\assets\script&quot;</code></pre>
+
+<p>Result summary:</p>
+
+<ul>
+<li>No existing OPEN GATE detection flow was found by text search.</li>
+<li><code>GameFactoryManager.initGameMode(gameMode)</code> owns game mode initialization.</li>
+<li><code>LudoGameManager.initGame(gameMode)</code> is the public facade that calls <code>GameFactoryManager.initGameMode(gameMode)</code>.</li>
+<li><code>LudoGameManager.setupRoom(...)</code> and <code>setupRoomWithColorIndex(...)</code> are table/room setup entry points.</li>
+<li><code>RoomPlayerManager.clear()</code> exists and is called when room managers are replaced.</li>
+</ul>
+
+<h2 id="ownership-review">Ownership Review</h2>
+
+<h3 id="which-object-owns-game-mode-setup">Which object owns game mode setup?</h3>
+
+<p>Primary owner:</p>
+
+<ul>
+<li><code>GameFactoryManager</code></li>
+</ul>
+
+<p>Evidence:</p>
+
+<ul>
+<li><code>GameFactoryManager</code> stores <code>_currentGameMode</code>.</li>
+<li><code>GameFactoryManager.initGameMode(gameMode)</code> creates game mode components.</li>
+<li><code>GameFactoryManager.getCurrentGameMode()</code> exposes the current mode.</li>
+</ul>
+
+<p>Facade owner:</p>
+
+<ul>
+<li><code>LudoGameManager</code></li>
+</ul>
+
+<p>Evidence:</p>
+
+<ul>
+<li><code>LudoGameManager.initGame(gameMode)</code> delegates to <code>_factoryManager.initGameMode(gameMode)</code>.</li>
+<li><code>LudoGameManager.getCurrentGameMode()</code> delegates to <code>_factoryManager.getCurrentGameMode()</code>.</li>
+</ul>
+
+<p>Recommendation:</p>
+
+<p>Game mode should be set on <code>LudoGlobalPathAdapter</code> during the same orchestration that creates or owns the adapter. Since no adapter owner exists yet, do not add a call blindly.</p>
+
+<h3 id="which-object-detects-open-gate">Which object detects OPEN GATE?</h3>
+
+<p>No existing OPEN GATE detection owner was found by text search.</p>
+
+<p>Recommendation:</p>
+
+<p>Do not place OPEN GATE rule detection inside <code>LudoGlobalPathAdapter</code>.</p>
+
+<p>The eventual detector should be a rule/gameplay owner that already knows:</p>
+
+<ul>
+<li>chair index</li>
+<li>current mode</li>
+<li>rule condition for opening gate</li>
+<li>timing of the turn state mutation</li>
+</ul>
+
+<p>That owner should call:</p>
+
+<pre><code>markQuickOpenGate(chairIndex)</code></pre>
+
+<p>after the rule condition is confirmed.</p>
+
+<h3 id="which-object-detects-game-end-or-table-change">Which object detects game end or table change?</h3>
+
+<p>Likely table/room lifecycle facade:</p>
+
+<ul>
+<li><code>LudoGameManager</code></li>
+</ul>
+
+<p>Evidence:</p>
+
+<ul>
+<li><code>setupRoom(playerCount)</code> recreates room manager state.</li>
+<li><code>initializeRoomManager(playerCount)</code> clears existing <code>RoomPlayerManager</code>.</li>
+<li><code>setupRoomWithColorIndex(playerCount, colorCombinationIndex)</code> also changes room setup flow.</li>
+</ul>
+
+<p>Likely game mode lifecycle owner:</p>
+
+<ul>
+<li><code>GameFactoryManager</code></li>
+</ul>
+
+<p>Evidence:</p>
+
+<ul>
+<li><code>initGameMode(gameMode)</code> destroys current factory components, map decorator, and game map center before creating new components.</li>
+</ul>
+
+<p>Recommendation:</p>
+
+<p>When an adapter owner exists, reset should happen during:</p>
+
+<ul>
+<li>game mode reinitialization</li>
+<li>room/table setup replacement</li>
+<li>explicit game end cleanup</li>
+</ul>
+
+<p>The call should be:</p>
+
+<pre><code>resetQuickOpenGateState()</code></pre>
+
+<h2 id="adapter-ownership-gap">Adapter Ownership Gap</h2>
+
+<p>Current production code does not show who owns:</p>
+
+<ul>
+<li><code>LudoGlobalPathAdapter</code></li>
+<li><code>LudoPathViewResolver</code></li>
+</ul>
+
+<p>Current path-facing APIs in <code>LudoGameManager</code> still call:</p>
+
+<ul>
+<li><code>getPathGenerator()?.getPlayerPath(...)</code></li>
+<li><code>getViewTransformer()?.getPathCoordInViewByStartIndex(...)</code></li>
+<li><code>getViewTransformer()?.getPathSegmentInViewByStartIndex(...)</code></li>
+<li><code>getViewTransformer()?.getPathCoordInViewByPos(...)</code></li>
+<li><code>getViewTransformer()?.getPathSegmentInViewByPos(...)</code></li>
+</ul>
+
+<p>This means the new adapter API exists, but no production flow currently wires it into game mode or path view queries.</p>
+
+<h2 id="integration-recommendation">Integration Recommendation</h2>
+
+<p>Do not connect calls directly in this phase.</p>
+
+<p>Recommended next spec/phase:</p>
+
+<ol>
+<li>Decide adapter ownership.</li>
+<li>Decide whether <code>LudoPathViewResolver</code> becomes the facade for server global grid id path queries.</li>
+<li>Add a single owner for adapter lifecycle.</li>
+<li>During adapter creation, call:</li>
+</ol>
+
+<pre><code>setGameMode(currentGameMode)</code></pre>
+
+<ol>
+<li>In the rule owner that detects OPEN GATE, call:</li>
+</ol>
+
+<pre><code>markQuickOpenGate(chairIndex)</code></pre>
+
+<ol>
+<li>On game end, game mode reinit, or table/room replacement, call:</li>
+</ol>
+
+<pre><code>resetQuickOpenGateState()</code></pre>
+
+<h2 id="files-changed-in-this-phase">Files Changed In This Phase</h2>
+
+<p>Workflow artifact only:</p>
+
+<ul>
+<li><code>assets/script/tsak/ai-workflow/reviews/2026-05-21-ludo-global-path-adapter-mode-source-phase-2-orchestration-review.md</code></li>
+</ul>
+
+<p>No production file was modified during Phase 2.</p>
+
+<h2 id="verification-evidence">Verification Evidence</h2>
+
+<p>No TypeScript compile was required for this review-only phase.</p>
+
+<p>Phase 1 focused compile remains the latest code verification evidence:</p>
+
+<pre><code>npx --no-install tsc --noEmit --skipLibCheck --target es6 --lib dom,dom.iterable,esnext --module commonjs &quot;D:\cocosTest\ludo\LUDO\assets\script\pathAdapter\LudoGlobalPathAdapter.ts&quot;</code></pre>
+
+<p>Result:</p>
+
+<pre><code>Exit code 0</code></pre>
+
+<h2 id="remaining-risk">Remaining Risk</h2>
+
+<ul>
+<li>Adapter state is not yet connected to game mode lifecycle.</li>
+<li>OPEN GATE detection owner is not identified in current code.</li>
+<li><code>LudoPathViewResolver</code> is not constructed in production code.</li>
+<li>QUICK <code>isFinished</code> behavior remains a separate rule question.</li>
+</ul>
+
+<h2 id="blocking-issue">Blocking Issue</h2>
+
+<p>Cannot safely wire <code>setGameMode</code>, <code>markQuickOpenGate</code>, or <code>resetQuickOpenGateState</code> until adapter ownership and OPEN GATE rule ownership are defined.</p>
+
+<h2 id="next-available-actions">Next Available Actions</h2>
+
+<ul>
+<li>Create a new spec for adapter/resolver ownership and integration.</li>
+<li>Pause and let the user decide where <code>LudoGlobalPathAdapter</code> should be owned.</li>
+<li>Add minimal construction API only after ownership is approved.</li>
+</ul>
+
+<h2 id="recommended-next-step">Recommended Next Step</h2>
+
+<p>Create a follow-up STANDARD spec for <code>LudoGlobalPathAdapter</code> / <code>LudoPathViewResolver</code> ownership and integration before changing production orchestration code.</p>
+    </main>
+  </div>
+</body>
+</html>

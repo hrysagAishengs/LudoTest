@@ -6,6 +6,8 @@
  * - Home 路段：52-57（座位0）/ 58-63（座位1）/ 64-69（座位2）/ 70-75（座位3）。
  * - 基地 Slot：負數，座位0 -> -1~-4，座位1 -> -5~-8，座位2 -> -9~-12，座位3 -> -13~-16。
  */
+import { LudoGameMode } from '../gameDef/GameDef';
+
 export const LUDO_BOARD_CONST = {
     PUBLIC_TRACK_SIZE: 52,
     HOME_LENGTH: 6,
@@ -42,16 +44,75 @@ export const LUDO_BOARD_CONST = {
 export class LudoGlobalPathAdapter {
     /** 路徑快取：chairIndex -> 57 個格子號的陣列。 */
     private readonly _cache: Map<number, number[]> = new Map();
+    /** 純公共路徑循環快取：chairIndex -> 52 格公共路徑。 */
+    private readonly _publicLoopCache: Map<number, number[]> = new Map();
+    private _gameMode: LudoGameMode = LudoGameMode.CLASSIC;
+    private readonly _quickOpenGateChairSet: Set<number> = new Set();
+
+    public setGameMode(gameMode: LudoGameMode): void {
+        if (this._gameMode === gameMode) {
+            return;
+        }
+
+        this._gameMode = gameMode;
+    }
+
+    public getGameMode(): LudoGameMode {
+        return this._gameMode;
+    }
+
+    public markQuickOpenGate(chairIndex: number): void {
+        if (!this.isValidChairIndex(chairIndex)) {
+            return;
+        }
+
+        this._quickOpenGateChairSet.add(chairIndex);
+    }
+
+    public isQuickOpenGate(chairIndex: number): boolean {
+        return this._quickOpenGateChairSet.has(chairIndex);
+    }
+
+    public resetQuickOpenGateState(): void {
+        this._quickOpenGateChairSet.clear();
+    }
 
     /**
      * 取得指定座位的完整路徑。
      * index 0 = 出發點，index 56 = 終點。
      */
     public getPlayerPath(chairIndex: number): number[] {
+        if (this.shouldUseFullPath(chairIndex)) {
+            return this.getFullPlayerPath(chairIndex);
+        }
+
+        return this.getPlayerPublicLoopPath(chairIndex);
+    }
+
+    private shouldUseFullPath(chairIndex: number): boolean {
+        if (this._gameMode === LudoGameMode.QUICK) {
+            return this.isQuickOpenGate(chairIndex);
+        }
+
+        return true;
+    }
+
+    private getFullPlayerPath(chairIndex: number): number[] {
         if (!this._cache.has(chairIndex)) {
             this._cache.set(chairIndex, this.buildPath(chairIndex));
         }
         return this._cache.get(chairIndex)!;
+    }
+
+    /**
+     * 取得指定座位的純公共路徑循環。
+     * 只包含 0~51 公共路徑，不會轉入 home。
+     */
+    public getPlayerPublicLoopPath(chairIndex: number): number[] {
+        if (!this._publicLoopCache.has(chairIndex)) {
+            this._publicLoopCache.set(chairIndex, this.buildPublicLoopPath(chairIndex));
+        }
+        return this._publicLoopCache.get(chairIndex)!;
     }
 
     /**
@@ -132,6 +193,10 @@ export class LudoGlobalPathAdapter {
     /**
      * 建立完整路徑：51 格公共路段 + 6 格 home，總長 57。
      */
+    private isValidChairIndex(chairIndex: number): boolean {
+        return chairIndex >= 0 && chairIndex < LUDO_BOARD_CONST.PLAYER_START.length;
+    }
+
     private buildPath(chairIndex: number): number[] {
         const {
             PUBLIC_TRACK_SIZE,
@@ -156,6 +221,21 @@ export class LudoGlobalPathAdapter {
 
         for (let i = 0; i < HOME_LENGTH; i++) {
             path.push(homeStart + i);
+        }
+
+        return path;
+    }
+
+    /**
+     * 建立指定座位的純公共路徑循環。
+     * 例如座位 1：13 -> 14 -> ... -> 51 -> 0 -> ... -> 12。
+     */
+    private buildPublicLoopPath(chairIndex: number): number[] {
+        const path: number[] = [];
+        const start: number = LUDO_BOARD_CONST.PLAYER_START[chairIndex];
+
+        for (let i = 0; i < LUDO_BOARD_CONST.PUBLIC_TRACK_SIZE; i++) {
+            path.push((start + i) % LUDO_BOARD_CONST.PUBLIC_TRACK_SIZE);
         }
 
         return path;
